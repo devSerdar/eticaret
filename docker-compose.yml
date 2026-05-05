@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: oyunticaret
+      POSTGRES_PASSWORD: oyunticaret_dev
+      POSTGRES_DB: oyunticaret
+    ports:
+      - "5432:5432"
+    volumes:
+      - oyunticaret_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oyunticaret -d oyunticaret"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  oyunticaret_pgdata:
