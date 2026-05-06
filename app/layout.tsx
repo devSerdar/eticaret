@@ -41,8 +41,13 @@ export default async function RootLayout({
   const showAdmin = session ? isAdminEmail(session.email) : false;
 
   return (
-    <html lang="tr" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col text-slate-900">
+    <html
+      lang="tr"
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      data-scroll-behavior="smooth"
+      suppressHydrationWarning
+    >
+      <body className="min-h-full flex flex-col text-slate-900" suppressHydrationWarning>
         <Navbar user={navUser} showAdmin={showAdmin} />
         <main className="relative flex-1">{children}</main>
         <Footer />

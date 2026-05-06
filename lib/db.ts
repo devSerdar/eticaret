@@ -110,6 +110,31 @@ async function runMigrations(p: pg.Pool) {
 
     CREATE INDEX IF NOT EXISTS idx_messages_order_created ON messages (order_id, created_at ASC);
 
+    CREATE TABLE IF NOT EXISTS order_action_requests (
+      id TEXT PRIMARY KEY,
+      order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL,
+      requested_by TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      reason TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'pending',
+      responded_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      response_reason TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      responded_at TIMESTAMPTZ,
+      CONSTRAINT order_action_requests_kind CHECK (
+        kind IN ('complete_sale', 'cancel_by_seller', 'cancel_by_buyer')
+      ),
+      CONSTRAINT order_action_requests_status CHECK (
+        status IN ('pending', 'approved', 'rejected')
+      )
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_order_action_requests_order_created
+      ON order_action_requests (order_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_order_action_requests_pending
+      ON order_action_requests (order_id, status)
+      WHERE status = 'pending';
+
     CREATE TABLE IF NOT EXISTS moderation_reports (
       id TEXT PRIMARY KEY,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

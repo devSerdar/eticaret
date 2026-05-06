@@ -78,12 +78,24 @@ export default async function PvpMarketListPage({ params, searchParams }: Market
   const { server: serverParam, market: marketParam } = await params;
   const query = await searchParams;
 
-  const server = getPvpServerBySlug(serverParam);
-  if (!server) notFound();
-  if (!isPvpMarketSlug(marketParam)) notFound();
+  const serverSlug = serverParam.trim().toLowerCase();
+  const marketSlug = marketParam.trim().toLowerCase();
 
-  const market = getPvpMarketBySlug(marketParam);
-  if (!market) notFound();
+  const server = getPvpServerBySlug(serverSlug);
+  if (!server) {
+    console.warn("[pvp-market] server_not_found", { serverParam, serverSlug, marketParam, marketSlug });
+    notFound();
+  }
+  if (!isPvpMarketSlug(marketSlug)) {
+    console.warn("[pvp-market] market_slug_invalid", { serverParam, serverSlug, marketParam, marketSlug });
+    notFound();
+  }
+
+  const market = getPvpMarketBySlug(marketSlug);
+  if (!market) {
+    console.warn("[pvp-market] market_not_found", { marketParam, marketSlug });
+    notFound();
+  }
 
   const gameName = GAME_MARKET_PLANS.find((g) => g.slug === "knight-online")?.name ?? "Knight Online";
 

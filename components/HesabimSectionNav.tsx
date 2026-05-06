@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 const LINKS = [
   { id: "hesap-ozeti", label: "Hesap ozeti" },
   { id: "cuzdan", label: "Cuzdan" },
+  { id: "aktif-siparisler", label: "Aktif siparisler" },
   { id: "hareketler", label: "Hareketler" },
   { id: "demo-bakiye", label: "Demo arac" },
 ] as const;
@@ -18,8 +19,8 @@ export default function HesabimSectionNav({ showDemo }: { showDemo: boolean }) {
   const ids = useMemo(
     (): readonly string[] =>
       showDemo
-        ? ["hesap-ozeti", "cuzdan", "hareketler", "demo-bakiye"]
-        : ["hesap-ozeti", "cuzdan", "hareketler"],
+        ? ["hesap-ozeti", "cuzdan", "aktif-siparisler", "hareketler", "demo-bakiye"]
+        : ["hesap-ozeti", "cuzdan", "aktif-siparisler", "hareketler"],
     [showDemo],
   );
 

@@ -5,8 +5,37 @@ import { randomBytes } from "crypto";
 import { getPool } from "@/lib/db";
 import { createModerationReport } from "@/lib/moderation";
 import { findUserById } from "@/lib/demo-auth-store";
+import { listMessagesForOrder, type ThreadMessage } from "@/lib/messages";
+import {
+  createOrderActionRequest,
+  listOrderActionRequests,
+  respondOrderActionRequest,
+  type OrderActionRequest,
+} from "@/lib/order-action-requests";
 import { getOrderDetailById, userCanAccessOrder } from "@/lib/orders";
 import { getSession } from "@/lib/session";
+
+export async function getOrderMessagesAction(
+  orderId: string,
+): Promise<{ error?: string; messages?: ThreadMessage[] }> {
+  const session = await getSession();
+  if (!session) return { error: "Oturum gerekli." };
+  const order = await getOrderDetailById(orderId);
+  if (!order || !userCanAccessOrder(session.userId, order)) return { error: "Erisim yok." };
+  const messages = await listMessagesForOrder(orderId);
+  return { messages };
+}
+
+export async function getOrderActionRequestsAction(
+  orderId: string,
+): Promise<{ error?: string; requests?: OrderActionRequest[] }> {
+  const session = await getSession();
+  if (!session) return { error: "Oturum gerekli." };
+  const order = await getOrderDetailById(orderId);
+  if (!order || !userCanAccessOrder(session.userId, order)) return { error: "Erisim yok." };
+  const requests = await listOrderActionRequests(orderId);
+  return { requests };
+}
 
 export async function sendOrderMessageAction(orderId: string, body: string): Promise<{ error?: string }> {
   const session = await getSession();
@@ -59,5 +88,52 @@ export async function reportOrderMessageAction(input: {
     note: input.note.trim() || "Kullanici bildirimi",
   });
   revalidatePath("/admin/moderasyon");
+  return {};
+}
+
+export async function requestOrderActionAction(input: {
+  orderId: string;
+  kind: "complete_sale" | "cancel_by_seller" | "cancel_by_buyer";
+  reason?: string;
+}): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session) return { error: "Oturum gerekli." };
+  const me = await findUserById(session.userId);
+  if (me?.bannedAt) return { error: "Hesabiniz yasakli." };
+
+  const r = await createOrderActionRequest({
+    orderId: input.orderId,
+    actorUserId: session.userId,
+    kind: input.kind,
+    reason: input.reason,
+  });
+  if (!r.ok) return { error: r.error };
+
+  revalidatePath(`/mesajlar/${encodeURIComponent(input.orderId)}`);
+  revalidatePath("/hesabim");
+  return {};
+}
+
+export async function respondOrderActionRequestAction(input: {
+  requestId: string;
+  orderId: string;
+  approve: boolean;
+  responseReason?: string;
+}): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session) return { error: "Oturum gerekli." };
+  const me = await findUserById(session.userId);
+  if (me?.bannedAt) return { error: "Hesabiniz yasakli." };
+
+  const r = await respondOrderActionRequest({
+    requestId: input.requestId,
+    actorUserId: session.userId,
+    approve: input.approve,
+    responseReason: input.responseReason,
+  });
+  if (!r.ok) return { error: r.error };
+
+  revalidatePath(`/mesajlar/${encodeURIComponent(input.orderId)}`);
+  revalidatePath("/hesabim");
   return {};
 }

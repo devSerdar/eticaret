@@ -195,6 +195,17 @@ export type AdminOrderRow = {
   messageCount: number;
 };
 
+export type UserOrderSummary = {
+  id: string;
+  createdAt: string;
+  listingId: string;
+  listingTitle: string;
+  priceTl: number;
+  role: "buyer" | "seller";
+  counterpartyName: string;
+  messageCount: number;
+};
+
 export async function listOrdersForAdmin(limit = 100): Promise<AdminOrderRow[]> {
   const pool = await getPool();
   const lim = Math.min(200, Math.max(1, Math.floor(limit)));
@@ -293,6 +304,54 @@ export async function listOrdersInvolvingUser(userId: string, limit = 40): Promi
       sellerId: r.seller_id,
       sellerEmail: r.seller_email,
       sellerName: r.seller_name,
+      messageCount: Number.parseInt(r.message_count, 10) || 0,
+    };
+  });
+}
+
+/** Kullanici paneli: aktif siparis ozeti (en guncel kayitlar). */
+export async function listUserOrderSummaries(userId: string, limit = 12): Promise<UserOrderSummary[]> {
+  const pool = await getPool();
+  const lim = Math.min(50, Math.max(1, Math.floor(limit)));
+  const { rows } = await pool.query<{
+    id: string;
+    created_at: Date;
+    listing_id: string;
+    listing_title: string;
+    price_tl: number;
+    buyer_id: string;
+    buyer_name: string;
+    seller_id: string;
+    seller_name: string;
+    message_count: string;
+  }>(
+    `SELECT o.id, o.created_at, o.listing_id, l.title AS listing_title, o.price_tl,
+            o.buyer_id, b.display_name AS buyer_name,
+            o.seller_id, s.display_name AS seller_name,
+            (SELECT COUNT(*)::text FROM messages m WHERE m.order_id = o.id) AS message_count
+     FROM orders o
+     JOIN listings l ON l.id = o.listing_id
+     JOIN users b ON b.id = o.buyer_id
+     JOIN users s ON s.id = o.seller_id
+     WHERE o.buyer_id = $1 OR o.seller_id = $1
+     ORDER BY o.created_at DESC
+     LIMIT $2`,
+    [userId, lim],
+  );
+  return rows.map((r) => {
+    const raw = r.created_at;
+    const createdAt =
+      raw instanceof Date ? raw.toISOString().replace("T", " ").slice(0, 19) : String(raw);
+    const role: "buyer" | "seller" = r.buyer_id === userId ? "buyer" : "seller";
+    const counterpartyName = role === "buyer" ? r.seller_name : r.buyer_name;
+    return {
+      id: r.id,
+      createdAt,
+      listingId: r.listing_id,
+      listingTitle: r.listing_title,
+      priceTl: Number(r.price_tl),
+      role,
+      counterpartyName,
       messageCount: Number.parseInt(r.message_count, 10) || 0,
     };
   });

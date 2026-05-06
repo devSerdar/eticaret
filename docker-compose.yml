@@ -1,6 +1,33 @@
 services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: oyunticaret_web
+    environment:
+      DATABASE_URL: postgresql://oyunticaret:oyunticaret_dev@db:5432/oyunticaret
+      AUTH_SECRET: ${AUTH_SECRET:-dev-only-secret-change-me}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      MOCK_INITIAL_BALANCE_TL: ${MOCK_INITIAL_BALANCE_TL:-0}
+      MOCK_MIN_TOPUP_TL: ${MOCK_MIN_TOPUP_TL:-50}
+      MOCK_MAX_TOPUP_TL: ${MOCK_MAX_TOPUP_TL:-100000}
+      MOCK_BAKIYE_DEMOSU: ${MOCK_BAKIYE_DEMOSU:-}
+      CHOKIDAR_USEPOLLING: "1"
+      WATCHPACK_POLLING: "true"
+    command: npx next dev --webpack --hostname 0.0.0.0 --port 3000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./:/app
+      - oyunticaret_node_modules:/app/node_modules
+      - oyunticaret_next_cache:/app/.next
+    depends_on:
+      db:
+        condition: service_healthy
+
   db:
     image: postgres:16-alpine
+    container_name: oyunticaret_db
     environment:
       POSTGRES_USER: oyunticaret
       POSTGRES_PASSWORD: oyunticaret_dev
@@ -17,3 +44,5 @@ services:
 
 volumes:
   oyunticaret_pgdata:
+  oyunticaret_node_modules:
+  oyunticaret_next_cache:
