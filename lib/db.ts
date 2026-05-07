@@ -1,6 +1,6 @@
 import pg from "pg";
 
-export type BalanceLedgerKind = "initial_balance" | "topup_simulated" | "purchase" | "demo_adjust";
+export type BalanceLedgerKind = "initial_balance" | "topup_simulated" | "purchase" | "demo_adjust" | "refund";
 
 export type BalanceLedgerRow = {
   id: string;
@@ -171,6 +171,10 @@ async function runMigrations(p: pg.Pool) {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS ban_reason TEXT;
 
     ALTER TABLE listings ADD COLUMN IF NOT EXISTS hidden_by_admin BOOLEAN NOT NULL DEFAULT false;
+  `);
+
+  await p.query(`
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
   `);
 }
 

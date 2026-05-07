@@ -11,14 +11,15 @@ import { listUserOrderSummaries } from "@/lib/orders";
 import { getSession } from "@/lib/session";
 
 export const metadata: Metadata = {
-  title: "Hesabim | OyunTicaret",
+  title: "Hesabım | OyunTicaret",
 };
 
 const KIND_TR: Record<BalanceLedgerKind, string> = {
-  initial_balance: "Baslangic bakiyesi",
-  topup_simulated: "Bakiye yukleme (sim.)",
-  purchase: "Satin alma",
-  demo_adjust: "Demo duzeltme",
+  initial_balance: "Başlangıç bakiyesi",
+  topup_simulated: "Bakiye yükleme (sim.)",
+  purchase: "Satın alma",
+  demo_adjust: "Demo düzeltme",
+  refund: "İptal iadesi",
 };
 
 function accountInitial(displayName: string, email: string): string {
@@ -36,172 +37,260 @@ export default async function HesabimPage() {
   const demoTopUp = process.env.MOCK_BAKIYE_DEMOSU === "1";
   const ledger = await getBalanceLedger(user.id, 25);
   const ownListings = await listListingsBySellerUserId(user.id, 400);
-  const activeOrders = await listUserOrderSummaries(user.id, 50);
+  const orderSummaries = await listUserOrderSummaries(user.id, 200, "all");
   const balanceFmt = user.balanceTL.toLocaleString("tr-TR");
   const memberSinceLabel = user.memberSince
     ? user.memberSince.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })
     : null;
-  const lastTx = ledger[0];
-  const creditCount = ledger.filter((r) => r.delta_tl > 0).length;
-  const debitCount = ledger.filter((r) => r.delta_tl < 0).length;
   const activeListings = ownListings.filter((l) => l.online);
   const pastListings = ownListings.filter((l) => !l.online);
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:py-12">
-      <header className="rounded-2xl border border-slate-200 bg-white px-6 py-6 shadow-sm sm:px-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Hesap paneli</p>
-            <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900">Hesabim</h1>
-            <p className="mt-2 text-sm text-slate-600">Ilanlariniz, siparisleriniz ve bakiye hareketleriniz.</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/ilanlar"
-              scroll={false}
-              className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-            >
-              Ilanlar
-            </Link>
-            <Link
-              href="/bakiye/yukle"
-              scroll={false}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
-            >
-              Bakiye yukle
-            </Link>
-          </div>
-        </div>
-      </header>
+    <div className="hesabim-page">
+      {/* Ambient background blobs */}
+      <div className="hesabim-bg-blob hesabim-bg-blob--1" aria-hidden />
+      <div className="hesabim-bg-blob hesabim-bg-blob--2" aria-hidden />
+      <div className="hesabim-bg-blob hesabim-bg-blob--3" aria-hidden />
 
-      <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Profil</p>
-          <div className="mt-3 flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-sm font-bold text-white">
+      <div className="hesabim-inner">
+
+        {/* ── HERO HEADER ── */}
+        <header className="hesabim-hero">
+          <div className="hesabim-hero__left">
+            <div className="hesabim-avatar">
               {accountInitial(user.displayName, user.email)}
-            </span>
-            <div className="min-w-0">
-              <p className="truncate font-semibold text-slate-900">{user.displayName}</p>
-              <p className="truncate text-xs text-slate-500">{user.email}</p>
+              <span className="hesabim-avatar__ring" aria-hidden />
+            </div>
+            <div>
+              <p className="hesabim-hero__eyebrow">Hesap Paneli</p>
+              <h1 className="hesabim-hero__name">{user.displayName}</h1>
+              <p className="hesabim-hero__email">{user.email}</p>
+              {memberSinceLabel && (
+                <p className="hesabim-hero__since">
+                  <span className="hesabim-badge hesabim-badge--muted">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                    Üye: {memberSinceLabel}
+                  </span>
+                </p>
+              )}
             </div>
           </div>
-          {memberSinceLabel ? <p className="mt-3 text-xs text-slate-500">Uye: {memberSinceLabel}</p> : null}
-        </article>
-
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Bakiye</p>
-          <p className="mt-3 text-3xl font-bold tabular-nums tracking-tight text-slate-900">{balanceFmt} TL</p>
-          <p className="mt-2 text-xs text-slate-500">Satin alma islemleri bu bakiyeden duser.</p>
-        </article>
-
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Ilanlarim</p>
-          <p className="mt-3 text-3xl font-bold tabular-nums text-slate-900">{ownListings.length}</p>
-          <p className="mt-2 text-xs text-slate-500">
-            {activeListings.length} aktif · {pastListings.length} gecmis
-          </p>
-        </article>
-
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Siparisler</p>
-          <p className="mt-3 text-3xl font-bold tabular-nums text-slate-900">{activeOrders.length}</p>
-          <p className="mt-2 text-xs text-slate-500">Mesajlasma kayitlariyla birlikte.</p>
-        </article>
-      </section>
-
-      <section className="mt-10 rounded-3xl border border-slate-200/90 bg-white p-6 shadow-sm ring-1 ring-slate-900/[0.03] sm:p-8">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900">Aktif siparisler</h2>
-            <p className="mt-1 text-sm text-slate-600">Karsilikli mesajlasma ve siparis takibi (son 50 kayit).</p>
+          <div className="hesabim-hero__actions">
+            <Link href="/ilanlar" scroll={false} className="hesabim-btn hesabim-btn--ghost">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M3 3h2l.4 2M7 13h10l4-8H5.4"/><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/></svg>
+              İlanlar
+            </Link>
+            <Link href="/bakiye/yukle" scroll={false} className="hesabim-btn hesabim-btn--primary">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 5v14M5 12l7-7 7 7"/></svg>
+              Bakiye Yükle
+            </Link>
           </div>
-          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            {activeOrders.length} kayit
-          </span>
-        </div>
+        </header>
 
-        <HesabimActiveOrdersPanel
-          orders={activeOrders}
-          currentUserId={session.userId}
-          currentUserDisplayName={session.displayName}
-        />
-      </section>
+        {/* ── STAT CARDS ── */}
+        <section className="hesabim-stats" aria-label="Özet istatistikler">
+          {/* Bakiye */}
+          <article className="hesabim-stat hesabim-stat--balance">
+            <div className="hesabim-stat__icon hesabim-stat__icon--gold">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/><path d="M12 6v2m0 8v2m-4-6h8"/></svg>
+            </div>
+            <div>
+              <p className="hesabim-stat__label">Bakiye</p>
+              <p className="hesabim-stat__value hesabim-stat__value--gold">{balanceFmt} <span className="hesabim-stat__unit">TL</span></p>
+              <p className="hesabim-stat__sub">Kullanılabilir bakiye</p>
+            </div>
+          </article>
 
-      <section className="mt-10 rounded-3xl border border-slate-200/90 bg-white p-6 shadow-sm ring-1 ring-slate-900/[0.03] sm:p-8">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900">Ilanlarim</h2>
-            <p className="mt-1 text-sm text-slate-600">Aktif ve gecmis ilanlarinizi bu alandan takip edebilirsiniz.</p>
+          {/* İlanlar */}
+          <article className="hesabim-stat hesabim-stat--listings">
+            <div className="hesabim-stat__icon hesabim-stat__icon--indigo">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            </div>
+            <div>
+              <p className="hesabim-stat__label">İlanlarım</p>
+              <p className="hesabim-stat__value">{ownListings.length}</p>
+              <p className="hesabim-stat__sub">
+                <span className="hesabim-dot hesabim-dot--green" /> {activeListings.length} aktif
+                &nbsp;·&nbsp;
+                <span className="hesabim-dot hesabim-dot--muted" /> {pastListings.length} geçmiş
+              </p>
+            </div>
+          </article>
+
+          {/* Siparişler */}
+          <article className="hesabim-stat hesabim-stat--orders">
+            <div className="hesabim-stat__icon hesabim-stat__icon--teal">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>
+            </div>
+            <div>
+              <p className="hesabim-stat__label">Siparişler</p>
+              <p className="hesabim-stat__value">{orderSummaries.length}</p>
+              <p className="hesabim-stat__sub">Aktif & geçmiş kayıtlar</p>
+            </div>
+          </article>
+
+          {/* Hareket */}
+          <article className="hesabim-stat hesabim-stat--ledger">
+            <div className="hesabim-stat__icon hesabim-stat__icon--violet">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            </div>
+            <div>
+              <p className="hesabim-stat__label">İşlemler</p>
+              <p className="hesabim-stat__value">{ledger.length}</p>
+              <p className="hesabim-stat__sub">Son 25 hareket kaydı</p>
+            </div>
+          </article>
+        </section>
+
+        {/* ── AKTİF SİPARİŞLER ── */}
+        <section className="hesabim-panel" aria-labelledby="orders-heading">
+          <div className="hesabim-panel__header">
+            <div>
+              <div className="hesabim-panel__title-row">
+                <span className="hesabim-panel__dot hesabim-panel__dot--blue" aria-hidden />
+                <h2 id="orders-heading" className="hesabim-panel__title">Siparişlerim</h2>
+                <span className="hesabim-badge hesabim-badge--count">{orderSummaries.length}</span>
+              </div>
+              <p className="hesabim-panel__desc">Aktif, tamamlanan ve iptal edilmiş siparişleriniz.</p>
+            </div>
+            <Link href="/siparislerim" scroll={false} className="hesabim-btn hesabim-btn--ghost hesabim-btn--sm">
+              Tümünü gör →
+            </Link>
           </div>
-          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            {ownListings.length} toplam ilan
-          </span>
-        </div>
-
-        <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/40 p-4">
-            <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">Aktif ilanlar</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-emerald-900">{activeListings.length}</p>
-            {activeListings.length === 0 ? (
-              <p className="mt-3 text-sm text-emerald-900/80">Aktif ilanin yok.</p>
-            ) : (
-              <ul className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
-                {activeListings.map((l) => (
-                  <li key={l.id} className="rounded-lg border border-emerald-200/70 bg-white/90 px-3 py-2">
-                    <Link href={`/ilanlar/${l.id}`} scroll={false} className="font-semibold text-slate-900 hover:text-indigo-700 hover:underline">
-                      {l.title}
-                    </Link>
-                    <p className="mt-1 text-xs text-slate-600">
-                      {l.serverSlug} / {l.marketSlug} · {l.price.toLocaleString("tr-TR")} TL
-                    </p>
-                    {l.hiddenByAdmin ? (
-                      <p className="mt-1 text-[11px] font-semibold text-amber-700">Yonetici tarafindan gizli</p>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-700">Gecmis ilanlar</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{pastListings.length}</p>
-            {pastListings.length === 0 ? (
-              <p className="mt-3 text-sm text-slate-600">Gecmis ilanin yok.</p>
-            ) : (
-              <ul className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
-                {pastListings.map((l) => (
-                  <li key={l.id} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                    <p className="font-medium text-slate-800">{l.title}</p>
-                    <p className="mt-1 text-xs text-slate-600">
-                      {l.serverSlug} / {l.marketSlug} · {l.price.toLocaleString("tr-TR")} TL · {l.createdAt}
-                    </p>
-                    {l.hiddenByAdmin ? (
-                      <p className="mt-1 text-[11px] font-semibold text-amber-700">Yonetici tarafindan gizli</p>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      </section>
-
-      <section className="mt-10">
-        <HesabimLedger ledger={ledger} kindTr={KIND_TR} />
-      </section>
-
-      {demoTopUp ? (
-        <section className="mt-10">
-          <h2 className="text-lg font-bold text-slate-900 sm:text-xl">Gelistirici araci</h2>
-          <p className="mt-1 text-sm text-slate-600">Yalnizca demo ortaminda; gercek odeme yok.</p>
-          <div className="mt-4">
-            <DemoBalanceTopUp />
+          <div className="hesabim-panel__body">
+            <HesabimActiveOrdersPanel
+              orders={orderSummaries}
+              currentUserId={session.userId}
+              currentUserDisplayName={session.displayName}
+              defaultTab="active"
+            />
           </div>
         </section>
-      ) : null}
+
+        {/* ── İLANLARIM ── */}
+        <section className="hesabim-panel" aria-labelledby="listings-heading">
+          <div className="hesabim-panel__header">
+            <div>
+              <div className="hesabim-panel__title-row">
+                <span className="hesabim-panel__dot hesabim-panel__dot--indigo" aria-hidden />
+                <h2 id="listings-heading" className="hesabim-panel__title">İlanlarım</h2>
+                <span className="hesabim-badge hesabim-badge--count">{ownListings.length}</span>
+              </div>
+              <p className="hesabim-panel__desc">Aktif ve geçmiş ilanlarınızı buradan yönetin.</p>
+            </div>
+            <Link href="/ilanlar/yeni" scroll={false} className="hesabim-btn hesabim-btn--primary hesabim-btn--sm">
+              + Yeni İlan
+            </Link>
+          </div>
+          <div className="hesabim-panel__body">
+            <div className="hesabim-listings-grid">
+              {/* Aktif */}
+              <div className="hesabim-listings-col hesabim-listings-col--active">
+                <div className="hesabim-listings-col__head">
+                  <span className="hesabim-dot hesabim-dot--green" />
+                  <span className="hesabim-listings-col__label">Aktif İlanlar</span>
+                  <span className="hesabim-badge hesabim-badge--green">{activeListings.length}</span>
+                </div>
+                {activeListings.length === 0 ? (
+                  <div className="hesabim-empty">
+                    <p className="hesabim-empty__text">Henüz aktif ilanın yok.</p>
+                    <Link href="/ilanlar/yeni" scroll={false} className="hesabim-btn hesabim-btn--ghost hesabim-btn--xs">İlan Oluştur</Link>
+                  </div>
+                ) : (
+                  <ul className="hesabim-listing-list">
+                    {activeListings.map((l) => (
+                      <li key={l.id} className="hesabim-listing-item hesabim-listing-item--active">
+                        <Link href={`/ilanlar/${l.id}`} scroll={false} className="hesabim-listing-item__title">
+                          {l.title}
+                        </Link>
+                        <p className="hesabim-listing-item__meta">
+                          {l.serverSlug} / {l.marketSlug}
+                        </p>
+                        <div className="hesabim-listing-item__footer">
+                          <span className="hesabim-listing-item__price">{l.price.toLocaleString("tr-TR")} TL</span>
+                          {l.hiddenByAdmin && (
+                            <span className="hesabim-badge hesabim-badge--warn">Yönetici gizledi</span>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {/* Geçmiş */}
+              <div className="hesabim-listings-col hesabim-listings-col--past">
+                <div className="hesabim-listings-col__head">
+                  <span className="hesabim-dot hesabim-dot--muted" />
+                  <span className="hesabim-listings-col__label">Geçmiş İlanlar</span>
+                  <span className="hesabim-badge hesabim-badge--muted">{pastListings.length}</span>
+                </div>
+                {pastListings.length === 0 ? (
+                  <div className="hesabim-empty">
+                    <p className="hesabim-empty__text">Geçmiş ilanın yok.</p>
+                  </div>
+                ) : (
+                  <ul className="hesabim-listing-list">
+                    {pastListings.map((l) => (
+                      <li key={l.id} className="hesabim-listing-item hesabim-listing-item--past">
+                        <p className="hesabim-listing-item__title hesabim-listing-item__title--muted">{l.title}</p>
+                        <p className="hesabim-listing-item__meta">
+                          {l.serverSlug} / {l.marketSlug}
+                        </p>
+                        <div className="hesabim-listing-item__footer">
+                          <span className="hesabim-listing-item__price hesabim-listing-item__price--muted">
+                            {l.price.toLocaleString("tr-TR")} TL
+                          </span>
+                          {l.hiddenByAdmin && (
+                            <span className="hesabim-badge hesabim-badge--warn">Yönetici gizledi</span>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── HAREKET GEÇMİŞİ ── */}
+        <section className="hesabim-panel" aria-labelledby="ledger-heading">
+          <div className="hesabim-panel__header">
+            <div>
+              <div className="hesabim-panel__title-row">
+                <span className="hesabim-panel__dot hesabim-panel__dot--violet" aria-hidden />
+                <h2 id="ledger-heading" className="hesabim-panel__title">Hareket Geçmişi</h2>
+                <span className="hesabim-badge hesabim-badge--count">{ledger.length}</span>
+              </div>
+              <p className="hesabim-panel__desc">Kronolojik kayıtlar; tutar ve bakiye sonrası.</p>
+            </div>
+          </div>
+          <div className="hesabim-panel__body">
+            <HesabimLedger ledger={ledger} kindTr={KIND_TR} />
+          </div>
+        </section>
+
+        {/* ── DEMO ARAÇ ── */}
+        {demoTopUp && (
+          <section className="hesabim-panel hesabim-panel--demo" aria-labelledby="demo-heading">
+            <div className="hesabim-panel__header">
+              <div>
+                <div className="hesabim-panel__title-row">
+                  <span className="hesabim-panel__dot hesabim-panel__dot--amber" aria-hidden />
+                  <h2 id="demo-heading" className="hesabim-panel__title">Geliştirici Aracı</h2>
+                  <span className="hesabim-badge hesabim-badge--warn">DEMO</span>
+                </div>
+                <p className="hesabim-panel__desc">Yalnızca demo ortamında geçerlidir; gerçek ödeme yok.</p>
+              </div>
+            </div>
+            <div className="hesabim-panel__body">
+              <DemoBalanceTopUp />
+            </div>
+          </section>
+        )}
+
+      </div>
     </div>
   );
 }

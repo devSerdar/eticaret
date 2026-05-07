@@ -1,6 +1,7 @@
 import { randomBytes } from "crypto";
 import { getPool } from "@/lib/db";
 import { getOrderDetailById } from "@/lib/orders";
+import { insertLedger } from "@/lib/demo-auth-store";
 
 export type OrderActionKind = "complete_sale" | "cancel_by_seller" | "cancel_by_buyer";
 export type OrderActionStatus = "pending" | "approved" | "rejected";
@@ -71,6 +72,7 @@ export async function createOrderActionRequest(input: {
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const order = await getOrderDetailById(input.orderId);
   if (!order) return { ok: false, error: "Siparis bulunamadi." };
+  if (order.cancelledAt) return { ok: false, error: "Bu siparis zaten iptal edilmis." };
 
   const isBuyer = order.buyerId === input.actorUserId;
   const isSeller = order.sellerId === input.actorUserId;
@@ -129,6 +131,7 @@ export async function respondOrderActionRequest(input: {
 
   const order = await getOrderDetailById(req.order_id);
   if (!order) return { ok: false, error: "Siparis bulunamadi." };
+  if (order.cancelledAt) return { ok: false, error: "Bu siparis zaten iptal edilmis." };
   const isBuyer = order.buyerId === input.actorUserId;
   const isSeller = order.sellerId === input.actorUserId;
   if (!isBuyer && !isSeller) return { ok: false, error: "Erisim yok." };
@@ -139,14 +142,85 @@ export async function respondOrderActionRequest(input: {
     return { ok: false, error: "Itiraz icin en az 4 karakter gerekce girin." };
   }
 
-  await pool.query(
-    `UPDATE order_action_requests
-     SET status = $2,
-         responded_by = $3,
-         response_reason = $4,
-         responded_at = now()
-     WHERE id = $1`,
-    [input.requestId, input.approve ? "approved" : "rejected", input.actorUserId, responseReason || null],
-  );
-  return { ok: true };
+  const isCancel = req.kind === "cancel_by_buyer" || req.kind === "cancel_by_seller";
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // Siparisi kilitle ve guncel iptal durumunu teyit et.
+    const { rows: orderLockRows } = await client.query<{ cancelled_at: Date | null; price_tl: number; buyer_id: string }>(
+      `SELECT cancelled_at, price_tl, buyer_id FROM orders WHERE id = $1 FOR UPDATE`,
+      [req.order_id],
+    );
+    const lockedOrder = orderLockRows[0];
+    if (!lockedOrder) {
+      await client.query("ROLLBACK");
+      return { ok: false, error: "Siparis bulunamadi." };
+    }
+    if (lockedOrder.cancelled_at) {
+      await client.query("ROLLBACK");
+      return { ok: false, error: "Bu siparis zaten iptal edilmis." };
+    }
+
+    // 1. Talep durumunu güncelle
+    await client.query(
+      `UPDATE order_action_requests
+       SET status = $2,
+           responded_by = $3,
+           response_reason = $4,
+           responded_at = now()
+       WHERE id = $1`,
+      [input.requestId, input.approve ? "approved" : "rejected", input.actorUserId, responseReason || null],
+    );
+
+    // 2. İptal onaylandıysa: siparişi iptal et + alıcıya iade
+    if (input.approve && isCancel) {
+      // Siparişi iptal et
+      await client.query(
+        `UPDATE orders SET cancelled_at = now() WHERE id = $1`,
+        [req.order_id],
+      );
+
+      // Alıcının bakiyesini kilitle
+      const { rows: balRows } = await client.query<{ balance_tl: number }>(
+        `SELECT balance_tl FROM users WHERE id = $1 FOR UPDATE`,
+        [lockedOrder.buyer_id],
+      );
+      const currentBalance = Number(balRows[0]?.balance_tl ?? 0);
+      const refundAmount = Number(lockedOrder.price_tl);
+      const newBalance = currentBalance + refundAmount;
+
+      // Bakiyeyi güncelle
+      await client.query(
+        `UPDATE users SET balance_tl = $1 WHERE id = $2`,
+        [newBalance, lockedOrder.buyer_id],
+      );
+
+      // Deftere iade kaydı
+      await insertLedger(client, lockedOrder.buyer_id, "refund", refundAmount, newBalance, {
+        orderId: req.order_id,
+        reason: "iptal_onaylandi",
+      });
+
+      // Diger bekleyen iptal/tamamlama taleplerini kapanmis siparis nedeniyle reddet.
+      await client.query(
+        `UPDATE order_action_requests
+         SET status = 'rejected',
+             responded_by = $2,
+             response_reason = COALESCE(response_reason, 'Siparis iptal edildigi icin otomatik kapatildi.'),
+             responded_at = now()
+         WHERE order_id = $1 AND status = 'pending' AND id <> $3`,
+        [req.order_id, input.actorUserId, input.requestId],
+      );
+    }
+
+    await client.query("COMMIT");
+    return { ok: true };
+  } catch (e: unknown) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
 }

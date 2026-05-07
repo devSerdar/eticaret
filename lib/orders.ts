@@ -18,6 +18,7 @@ export type OrderDetail = {
   sellerId: string;
   priceTl: number;
   createdAt: string;
+  cancelledAt: string | null;
   buyerDisplayName: string;
   sellerDisplayName: string;
 };
@@ -35,10 +36,11 @@ export async function getOrderDetailById(orderId: string): Promise<OrderDetail |
     seller_id: string;
     price_tl: number;
     created_at: Date;
+    cancelled_at: Date | null;
     buyer_display_name: string;
     seller_display_name: string;
   }>(
-    `SELECT o.id, o.listing_id, o.buyer_id, o.seller_id, o.price_tl, o.created_at,
+    `SELECT o.id, o.listing_id, o.buyer_id, o.seller_id, o.price_tl, o.created_at, o.cancelled_at,
             b.display_name AS buyer_display_name,
             s.display_name AS seller_display_name
      FROM orders o
@@ -52,6 +54,13 @@ export async function getOrderDetailById(orderId: string): Promise<OrderDetail |
   const raw = r.created_at;
   const created =
     raw instanceof Date ? raw.toISOString().replace("T", " ").slice(0, 19) : String(raw);
+  const cancelledRaw = r.cancelled_at;
+  const cancelledAt =
+    cancelledRaw == null
+      ? null
+      : cancelledRaw instanceof Date
+        ? cancelledRaw.toISOString().replace("T", " ").slice(0, 19)
+        : String(cancelledRaw);
   return {
     id: r.id,
     listingId: r.listing_id,
@@ -59,6 +68,7 @@ export async function getOrderDetailById(orderId: string): Promise<OrderDetail |
     sellerId: r.seller_id,
     priceTl: Number(r.price_tl),
     createdAt: created,
+    cancelledAt,
     buyerDisplayName: r.buyer_display_name,
     sellerDisplayName: r.seller_display_name,
   };
@@ -201,6 +211,7 @@ export type UserOrderSummary = {
   listingId: string;
   listingTitle: string;
   priceTl: number;
+  status: "active" | "completed" | "cancelled";
   role: "buyer" | "seller";
   counterpartyName: string;
   messageCount: number;
@@ -310,7 +321,11 @@ export async function listOrdersInvolvingUser(userId: string, limit = 40): Promi
 }
 
 /** Kullanici paneli: aktif siparis ozeti (en guncel kayitlar). */
-export async function listUserOrderSummaries(userId: string, limit = 12): Promise<UserOrderSummary[]> {
+export async function listUserOrderSummaries(
+  userId: string,
+  limit = 12,
+  status: "active" | "completed" | "cancelled" | "all" = "active",
+): Promise<UserOrderSummary[]> {
   const pool = await getPool();
   const lim = Math.min(50, Math.max(1, Math.floor(limit)));
   const { rows } = await pool.query<{
@@ -324,19 +339,59 @@ export async function listUserOrderSummaries(userId: string, limit = 12): Promis
     seller_id: string;
     seller_name: string;
     message_count: string;
+    order_status: "active" | "completed" | "cancelled";
   }>(
     `SELECT o.id, o.created_at, o.listing_id, l.title AS listing_title, o.price_tl,
             o.buyer_id, b.display_name AS buyer_name,
             o.seller_id, s.display_name AS seller_name,
+            CASE
+              WHEN o.cancelled_at IS NOT NULL THEN 'cancelled'
+              WHEN EXISTS (
+                SELECT 1
+                FROM order_action_requests ar
+                WHERE ar.order_id = o.id
+                  AND ar.kind = 'complete_sale'
+                  AND ar.status = 'approved'
+              ) THEN 'completed'
+              ELSE 'active'
+            END AS order_status,
             (SELECT COUNT(*)::text FROM messages m WHERE m.order_id = o.id) AS message_count
      FROM orders o
      JOIN listings l ON l.id = o.listing_id
      JOIN users b ON b.id = o.buyer_id
      JOIN users s ON s.id = o.seller_id
-     WHERE o.buyer_id = $1 OR o.seller_id = $1
+     WHERE (o.buyer_id = $1 OR o.seller_id = $1)
+       AND (
+         $2::text = 'all'
+         OR (
+           $2::text = 'cancelled' AND o.cancelled_at IS NOT NULL
+         )
+         OR (
+           $2::text = 'completed'
+           AND o.cancelled_at IS NULL
+           AND EXISTS (
+             SELECT 1
+             FROM order_action_requests ar2
+             WHERE ar2.order_id = o.id
+               AND ar2.kind = 'complete_sale'
+               AND ar2.status = 'approved'
+           )
+         )
+         OR (
+           $2::text = 'active'
+           AND o.cancelled_at IS NULL
+           AND NOT EXISTS (
+             SELECT 1
+             FROM order_action_requests ar3
+             WHERE ar3.order_id = o.id
+               AND ar3.kind = 'complete_sale'
+               AND ar3.status = 'approved'
+           )
+         )
+       )
      ORDER BY o.created_at DESC
-     LIMIT $2`,
-    [userId, lim],
+     LIMIT $3`,
+    [userId, status, lim],
   );
   return rows.map((r) => {
     const raw = r.created_at;
@@ -350,6 +405,7 @@ export async function listUserOrderSummaries(userId: string, limit = 12): Promis
       listingId: r.listing_id,
       listingTitle: r.listing_title,
       priceTl: Number(r.price_tl),
+      status: r.order_status,
       role,
       counterpartyName,
       messageCount: Number.parseInt(r.message_count, 10) || 0,
