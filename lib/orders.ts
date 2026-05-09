@@ -215,6 +215,7 @@ export type UserOrderSummary = {
   role: "buyer" | "seller";
   counterpartyName: string;
   messageCount: number;
+  unreadCount: number;
 };
 
 export async function listOrdersForAdmin(limit = 100): Promise<AdminOrderRow[]> {
@@ -339,6 +340,7 @@ export async function listUserOrderSummaries(
     seller_id: string;
     seller_name: string;
     message_count: string;
+    unread_count: string;
     order_status: "active" | "completed" | "cancelled";
   }>(
     `SELECT o.id, o.created_at, o.listing_id, l.title AS listing_title, o.price_tl,
@@ -355,7 +357,18 @@ export async function listUserOrderSummaries(
               ) THEN 'completed'
               ELSE 'active'
             END AS order_status,
-            (SELECT COUNT(*)::text FROM messages m WHERE m.order_id = o.id) AS message_count
+            (SELECT COUNT(*)::text FROM messages m WHERE m.order_id = o.id) AS message_count,
+            (
+              SELECT COUNT(*)::text
+              FROM messages m2
+              WHERE m2.order_id = o.id
+                AND m2.sender_id <> $1
+                AND NOT EXISTS (
+                  SELECT 1
+                  FROM message_reads mr
+                  WHERE mr.message_id = m2.id AND mr.user_id = $1
+                )
+            ) AS unread_count
      FROM orders o
      JOIN listings l ON l.id = o.listing_id
      JOIN users b ON b.id = o.buyer_id
@@ -409,6 +422,7 @@ export async function listUserOrderSummaries(
       role,
       counterpartyName,
       messageCount: Number.parseInt(r.message_count, 10) || 0,
+      unreadCount: Number.parseInt(r.unread_count, 10) || 0,
     };
   });
 }

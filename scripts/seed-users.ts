@@ -2,7 +2,7 @@ import "dotenv/config";
 
 import { registerDemoUser } from "../lib/demo-auth-store";
 
-const PASSWORD = "Test123456!";
+const PASSWORD = "12345678";
 const COUNT = 10;
 
 async function main() {

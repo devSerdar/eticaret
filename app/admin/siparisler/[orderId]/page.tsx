@@ -15,7 +15,7 @@ export default async function AdminSiparisMesajPage({ params }: PageProps) {
   if (!order) notFound();
 
   const listing = await adminGetListingById(order.listingId);
-  const messages = await listMessagesForOrder(order.id);
+  const messages = await listMessagesForOrder(order.id, order.buyerId);
 
   return (
     <div>

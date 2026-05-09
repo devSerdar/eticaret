@@ -5,7 +5,7 @@ import { randomBytes } from "crypto";
 import { getPool } from "@/lib/db";
 import { createModerationReport } from "@/lib/moderation";
 import { findUserById } from "@/lib/demo-auth-store";
-import { listMessagesForOrder, type ThreadMessage } from "@/lib/messages";
+import { listMessagesForOrder, markOrderMessagesSeen, type ThreadMessage } from "@/lib/messages";
 import {
   createOrderActionRequest,
   listOrderActionRequests,
@@ -22,7 +22,8 @@ export async function getOrderMessagesAction(
   if (!session) return { error: "Oturum gerekli." };
   const order = await getOrderDetailById(orderId);
   if (!order || !userCanAccessOrder(session.userId, order)) return { error: "Erisim yok." };
-  const messages = await listMessagesForOrder(orderId);
+  await markOrderMessagesSeen(orderId, session.userId);
+  const messages = await listMessagesForOrder(orderId, session.userId);
   return { messages };
 }
 

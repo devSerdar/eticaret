@@ -110,6 +110,16 @@ async function runMigrations(p: pg.Pool) {
 
     CREATE INDEX IF NOT EXISTS idx_messages_order_created ON messages (order_id, created_at ASC);
 
+    CREATE TABLE IF NOT EXISTS message_reads (
+      message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (message_id, user_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_message_reads_user_seen
+      ON message_reads (user_id, seen_at DESC);
+
     CREATE TABLE IF NOT EXISTS order_action_requests (
       id TEXT PRIMARY KEY,
       order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,

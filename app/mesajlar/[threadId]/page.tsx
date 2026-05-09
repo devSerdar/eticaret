@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import OrderThreadPanel from "@/components/OrderThreadPanel";
 import { getListingById } from "@/lib/listings";
-import { listMessagesForOrder } from "@/lib/messages";
+import { listMessagesForOrder, markOrderMessagesSeen } from "@/lib/messages";
 import { getOrderDetailById, userCanAccessOrder } from "@/lib/orders";
 import { getSession } from "@/lib/session";
 
@@ -46,7 +46,8 @@ export default async function MesajThreadPage({ params, searchParams }: PageProp
   const listing = await getListingById(order.listingId);
   if (!listing) notFound();
 
-  const messages = await listMessagesForOrder(order.id);
+  await markOrderMessagesSeen(order.id, session.userId);
+  const messages = await listMessagesForOrder(order.id, session.userId);
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-12 sm:py-14">

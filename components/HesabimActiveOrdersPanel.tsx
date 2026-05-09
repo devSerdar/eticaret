@@ -22,6 +22,7 @@ type ActiveOrder = {
   role: "buyer" | "seller";
   counterpartyName: string;
   messageCount: number;
+  unreadCount: number;
 };
 
 type Props = {
@@ -69,9 +70,11 @@ export default function HesabimActiveOrdersPanel({
   const [rejectReason, setRejectReason] = useState<Record<string, string>>({});
   const [showActions, setShowActions] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Tabloda canlı mesaj sayıları (orderId → count + lastMsg)
-  const [liveCounts, setLiveCounts] = useState<Record<string, { count: number; lastMsg?: string }>>(() =>
-    Object.fromEntries(orders.map((o) => [o.id, { count: o.messageCount }]))
+  // Tabloda canlı sayaçlar (orderId → total + unread + lastMsg)
+  const [liveCounts, setLiveCounts] = useState<
+    Record<string, { count: number; unread: number; lastMsg?: string }>
+  >(() =>
+    Object.fromEntries(orders.map((o) => [o.id, { count: o.messageCount, unread: o.unreadCount }]))
   );
 
   const [loading, startLoading] = useTransition();
@@ -97,11 +100,12 @@ export default function HesabimActiveOrdersPanel({
     // Tablodaki canlı sayacı güncelle
     const msgs = mr.messages ?? [];
     const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1].body : undefined;
+    const unread = msgs.filter((m) => m.senderId !== currentUserId && !m.seenByViewer).length;
     setLiveCounts((prev) => ({
       ...prev,
-      [orderId]: { count: msgs.length, lastMsg },
+      [orderId]: { count: msgs.length, unread, lastMsg },
     }));
-  }, []);
+  }, [currentUserId]);
 
   // ── Modal açılınca ilk yükleme ──
   useEffect(() => {
@@ -130,9 +134,10 @@ export default function HesabimActiveOrdersPanel({
         if (msgs.length !== messages.length) {
           setMessages(msgs);
           const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1].body : undefined;
+          const unread = msgs.filter((m) => m.senderId !== currentUserId && !m.seenByViewer).length;
           setLiveCounts((prev) => ({
             ...prev,
-            [selected.id]: { count: msgs.length, lastMsg },
+            [selected.id]: { count: msgs.length, unread, lastMsg },
           }));
         }
       }
@@ -158,10 +163,10 @@ export default function HesabimActiveOrdersPanel({
   const handleClose = () => setSelected(null);
   useEffect(() => {
     setLiveCounts((prev) => {
-      const next: Record<string, { count: number; lastMsg?: string }> = {};
+      const next: Record<string, { count: number; unread: number; lastMsg?: string }> = {};
       for (const o of orders) {
         const old = prev[o.id];
-        next[o.id] = old ?? { count: o.messageCount };
+        next[o.id] = old ?? { count: o.messageCount, unread: o.unreadCount };
       }
       return next;
     });
@@ -220,7 +225,7 @@ export default function HesabimActiveOrdersPanel({
         ) : (
           <div className="orders-card-list">
             {visibleOrders.map((o) => {
-              const live = liveCounts[o.id] ?? { count: o.messageCount };
+              const live = liveCounts[o.id] ?? { count: o.messageCount, unread: o.unreadCount };
               const isActive = selected?.id === o.id;
               return (
                 <button
@@ -254,9 +259,9 @@ export default function HesabimActiveOrdersPanel({
 
                   {/* Sağ: mesaj sayacı + tarih */}
                   <div className="orders-card__right">
-                    {live.count > 0 && (
+                    {live.unread > 0 && (
                       <span className={`orders-msg-count ${live.count > 0 ? "orders-msg-count--has" : ""}`}>
-                        {live.count}
+                        {live.unread}
                       </span>
                     )}
                     <span className="orders-card__date">{o.createdAt.slice(0, 10)}</span>
@@ -432,7 +437,17 @@ export default function HesabimActiveOrdersPanel({
                         <div className={`chat-bubble ${mine ? "chat-bubble--mine" : "chat-bubble--theirs"}`}>
                           {!mine && <p className="chat-bubble__sender">{m.senderDisplayName}</p>}
                           <p className="chat-bubble__body">{m.body}</p>
-                          <p className={`chat-bubble__time ${mine ? "chat-bubble__time--mine" : ""}`}>{m.createdAt}</p>
+                          <p className={`chat-bubble__time ${mine ? "chat-bubble__time--mine" : ""}`}>
+                            {m.createdAt}
+                            {mine ? (
+                              <span className={`ml-1 inline-flex align-middle ${m.seenByOther ? "text-cyan-200" : "text-indigo-200"}`} aria-label={m.seenByOther ? "Goruldu" : "Gonderildi"}>
+                                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                                  <path d="m3 10 3 3 5-6" />
+                                  <path d="m8 10 3 3 6-7" />
+                                </svg>
+                              </span>
+                            ) : null}
+                          </p>
                         </div>
                       </div>
                     );
