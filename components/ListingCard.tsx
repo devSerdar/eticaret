@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { Listing } from "@/lib/listings";
 import type { PvpMarketSlug } from "@/lib/ko-pvp-catalog";
 import { getKoJobLabel } from "@/lib/ko-jobs";
@@ -44,10 +45,18 @@ export default function ListingCard({ listing, gameName, serverName, marketLabel
       <div className="flex flex-1 flex-col p-5">
         <div className="flex min-h-0 flex-1 gap-4">
           <div
-            className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${accent.icon} text-lg font-black text-white shadow-lg`}
+            className={`relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br ${accent.icon} text-lg font-black text-white shadow-lg`}
             aria-hidden
           >
-            {listing.marketSlug === "goldbar" ? "G" : listing.marketSlug === "css" ? "C" : "I"}
+            {listing.imageUrl ? (
+              <Image src={listing.imageUrl} alt={listing.title} fill sizes="56px" className="object-cover" />
+            ) : listing.marketSlug === "goldbar" ? (
+              "G"
+            ) : listing.marketSlug === "css" ? (
+              "C"
+            ) : (
+              "I"
+            )}
           </div>
           <div className="flex min-w-0 flex-1 flex-col">
             <div className="flex min-w-0 items-start justify-between gap-2">

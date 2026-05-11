@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
+import useSWR from "swr";
 import {
   getOrderActionRequestsAction,
   getOrderMessagesAction,
@@ -63,25 +64,15 @@ export default function HesabimActiveOrdersPanel({
 }: Props) {
   const [tab, setTab] = useState<"active" | "completed" | "cancelled">(defaultTab);
   const [selected, setSelected] = useState<ActiveOrder | null>(null);
-  const [messages, setMessages] = useState<ThreadMessage[]>([]);
-  const [requests, setRequests] = useState<OrderActionRequest[]>([]);
   const [draft, setDraft] = useState("");
   const [actionReason, setActionReason] = useState("");
   const [rejectReason, setRejectReason] = useState<Record<string, string>>({});
   const [showActions, setShowActions] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Tabloda canlı sayaçlar (orderId → total + unread + lastMsg)
-  const [liveCounts, setLiveCounts] = useState<
-    Record<string, { count: number; unread: number; lastMsg?: string }>
-  >(() =>
-    Object.fromEntries(orders.map((o) => [o.id, { count: o.messageCount, unread: o.unreadCount }]))
-  );
 
-  const [loading, startLoading] = useTransition();
   const [sending, startSending] = useTransition();
   const [acting, startActing] = useTransition();
   const scrollViewportRef = useRef<HTMLElement | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const counts = {
     active: orders.filter((o) => o.status === "active").length,
     completed: orders.filter((o) => o.status === "completed").length,
@@ -89,66 +80,49 @@ export default function HesabimActiveOrdersPanel({
   };
   const visibleOrders = orders.filter((o) => o.status === tab);
 
-  // ── Mesajları yükle (ilk açılış + polling) ──
-  const fetchMessages = useCallback(async (orderId: string) => {
-    const [mr, ar] = await Promise.all([
-      getOrderMessagesAction(orderId),
-      getOrderActionRequestsAction(orderId),
-    ]);
-    if (!mr.error) setMessages(mr.messages ?? []);
-    if (!ar.error) setRequests(ar.requests ?? []);
-    // Tablodaki canlı sayacı güncelle
-    const msgs = mr.messages ?? [];
-    const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1].body : undefined;
-    const unread = msgs.filter((m) => m.senderId !== currentUserId && !m.seenByViewer).length;
-    setLiveCounts((prev) => ({
-      ...prev,
-      [orderId]: { count: msgs.length, unread, lastMsg },
-    }));
-  }, [currentUserId]);
-
-  // ── Modal açılınca ilk yükleme ──
-  useEffect(() => {
-    if (!selected) return;
+  const selectOrder = (o: ActiveOrder) => {
     setError(null);
     setDraft("");
     setShowActions(false);
-    startLoading(async () => {
-      await fetchMessages(selected.id);
-    });
-  }, [selected, fetchMessages]);
+    setSelected(o);
+  };
 
-  // ── Polling: modal açıkken 5 sn'de bir kontrol ──
-  useEffect(() => {
-    if (!selected) {
-      if (pollRef.current) clearInterval(pollRef.current);
-      return;
-    }
-    pollRef.current = setInterval(async () => {
+  const handleTabChange = (newTab: "active" | "completed" | "cancelled") => {
+    setTab(newTab);
+    setSelected(null);
+  };
+
+  // ── Mesajları yükle (SWR) ──
+  const { data, mutate, isLoading: loading } = useSWR(
+    selected ? `chat-${selected.id}` : null,
+    async () => {
       const [mr, ar] = await Promise.all([
-        getOrderMessagesAction(selected.id),
-        getOrderActionRequestsAction(selected.id),
+        getOrderMessagesAction(selected!.id),
+        getOrderActionRequestsAction(selected!.id),
       ]);
-      if (!mr.error) {
-        const msgs = mr.messages ?? [];
-        if (msgs.length !== messages.length) {
-          setMessages(msgs);
-          const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1].body : undefined;
-          const unread = msgs.filter((m) => m.senderId !== currentUserId && !m.seenByViewer).length;
-          setLiveCounts((prev) => ({
-            ...prev,
-            [selected.id]: { count: msgs.length, unread, lastMsg },
-          }));
-        }
-      }
-      if (!ar.error) {
-        setRequests(ar.requests ?? []);
-      }
-    }, POLL_INTERVAL_MS);
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, [selected, messages.length]);
+      return { messages: mr.messages ?? [], requests: ar.requests ?? [] };
+    },
+    { refreshInterval: 5000, keepPreviousData: true }
+  );
+
+  const messages = data?.messages ?? [];
+  const requests = data?.requests ?? [];
+
+  const computedLiveCounts = useMemo(() => {
+    const map: Record<string, { count: number; unread: number; lastMsg?: string }> = {};
+    for (const o of orders) {
+      map[o.id] = { count: o.messageCount, unread: o.unreadCount };
+    }
+    if (selected && data) {
+      const msgs = data.messages;
+      const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1].body : undefined;
+      const unread = msgs.filter((m) => m.senderId !== currentUserId && !m.seenByViewer).length;
+      map[selected.id] = { count: msgs.length, unread, lastMsg };
+    }
+    return map;
+  }, [orders, selected, data, currentUserId]);
+
+
 
   // ── Scroll to bottom ──
   useLayoutEffect(() => {
@@ -161,41 +135,27 @@ export default function HesabimActiveOrdersPanel({
   }, [messages.length, requests.length, selected]);
 
   const handleClose = () => setSelected(null);
-  useEffect(() => {
-    setLiveCounts((prev) => {
-      const next: Record<string, { count: number; unread: number; lastMsg?: string }> = {};
-      for (const o of orders) {
-        const old = prev[o.id];
-        next[o.id] = old ?? { count: o.messageCount, unread: o.unreadCount };
-      }
-      return next;
-    });
-  }, [orders]);
-  useEffect(() => {
-    if (!selected) return;
-    if (!visibleOrders.some((o) => o.id === selected.id)) setSelected(null);
-  }, [visibleOrders, selected]);
 
   return (
     <>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <button
           type="button"
-          onClick={() => setTab("active")}
+          onClick={() => handleTabChange("active")}
           className={`rounded-full px-3 py-1.5 text-xs font-semibold ${tab === "active" ? "bg-sky-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
         >
           Aktif ({counts.active})
         </button>
         <button
           type="button"
-          onClick={() => setTab("completed")}
+          onClick={() => handleTabChange("completed")}
           className={`rounded-full px-3 py-1.5 text-xs font-semibold ${tab === "completed" ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
         >
           Tamamlanan ({counts.completed})
         </button>
         <button
           type="button"
-          onClick={() => setTab("cancelled")}
+          onClick={() => handleTabChange("cancelled")}
           className={`rounded-full px-3 py-1.5 text-xs font-semibold ${tab === "cancelled" ? "bg-rose-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
         >
           İptal Edilmiş ({counts.cancelled})
@@ -225,13 +185,13 @@ export default function HesabimActiveOrdersPanel({
         ) : (
           <div className="orders-card-list">
             {visibleOrders.map((o) => {
-              const live = liveCounts[o.id] ?? { count: o.messageCount, unread: o.unreadCount };
+              const live = computedLiveCounts[o.id] ?? { count: o.messageCount, unread: o.unreadCount };
               const isActive = selected?.id === o.id;
               return (
                 <button
                   key={o.id}
                   type="button"
-                  onClick={() => setSelected(o)}
+                  onClick={() => selectOrder(o)}
                   className={`orders-card ${isActive ? "orders-card--active" : ""}`}
                 >
                   {/* Sol: avatar */}
@@ -351,8 +311,7 @@ export default function HesabimActiveOrdersPanel({
                             startActing(async () => {
                               const r = await requestOrderActionAction({ orderId: selected.id, kind: "complete_sale" });
                               if (r.error) { setError(r.error); return; }
-                              const loaded = await getOrderActionRequestsAction(selected.id);
-                              setRequests(loaded.requests ?? []);
+                              mutate();
                             });
                           }}
                           className="chat-action-btn chat-action-btn--complete"
@@ -368,8 +327,7 @@ export default function HesabimActiveOrdersPanel({
                               const r = await requestOrderActionAction({ orderId: selected.id, kind: "cancel_by_seller", reason: actionReason });
                               if (r.error) { setError(r.error); return; }
                               setActionReason("");
-                              const loaded = await getOrderActionRequestsAction(selected.id);
-                              setRequests(loaded.requests ?? []);
+                              mutate();
                             });
                           }}
                           className="chat-action-btn chat-action-btn--cancel"
@@ -387,8 +345,7 @@ export default function HesabimActiveOrdersPanel({
                             const r = await requestOrderActionAction({ orderId: selected.id, kind: "cancel_by_buyer", reason: actionReason });
                             if (r.error) { setError(r.error); return; }
                             setActionReason("");
-                            const loaded = await getOrderActionRequestsAction(selected.id);
-                            setRequests(loaded.requests ?? []);
+                            mutate();
                           });
                         }}
                         className="chat-action-btn chat-action-btn--cancel"
@@ -502,8 +459,7 @@ export default function HesabimActiveOrdersPanel({
                                   startActing(async () => {
                                     const res = await respondOrderActionRequestAction({ requestId: r.id, orderId: selected.id, approve: true });
                                     if (res.error) { setError(res.error); return; }
-                                    const loaded = await getOrderActionRequestsAction(selected.id);
-                                    setRequests(loaded.requests ?? []);
+                                    mutate();
                                   });
                                 }}
                                 className="order-req__btn order-req__btn--approve"
@@ -517,8 +473,7 @@ export default function HesabimActiveOrdersPanel({
                                     const res = await respondOrderActionRequestAction({ requestId: r.id, orderId: selected.id, approve: false, responseReason: rejectVal });
                                     if (res.error) { setError(res.error); return; }
                                     setRejectReason((prev) => ({ ...prev, [r.id]: "" }));
-                                    const loaded = await getOrderActionRequestsAction(selected.id);
-                                    setRequests(loaded.requests ?? []);
+                                    mutate();
                                   });
                                 }}
                                 className="order-req__btn order-req__btn--reject"
@@ -553,7 +508,7 @@ export default function HesabimActiveOrdersPanel({
                     const r = await sendOrderMessageAction(selected.id, text);
                     if (r.error) { setError(r.error); return; }
                     setDraft("");
-                    await fetchMessages(selected.id);
+                    mutate();
                   });
                 }}
                 className="chat-compose"

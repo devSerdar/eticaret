@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import { getPool } from "@/lib/db";
 import { insertLedger } from "@/lib/demo-auth-store";
 import { createMockOrderRef } from "@/lib/mock-order";
+import { cache } from "react";
 
 type ListingLockRow = {
   id: string;
@@ -27,7 +28,7 @@ export function userCanAccessOrder(sessionUserId: string, order: OrderDetail): b
   return sessionUserId === order.buyerId || sessionUserId === order.sellerId;
 }
 
-export async function getOrderDetailById(orderId: string): Promise<OrderDetail | undefined> {
+export const getOrderDetailById = cache(async (orderId: string): Promise<OrderDetail | undefined> => {
   const pool = await getPool();
   const { rows } = await pool.query<{
     id: string;
@@ -72,7 +73,7 @@ export async function getOrderDetailById(orderId: string): Promise<OrderDetail |
     buyerDisplayName: r.buyer_display_name,
     sellerDisplayName: r.seller_display_name,
   };
-}
+});
 
 /** Tamamlanma talebi onaylanmis siparis (yonetici iptali engellenir). */
 export async function isOrderSaleCompleted(orderId: string): Promise<boolean> {

@@ -1,6 +1,7 @@
 import { getPool } from "@/lib/db";
 import { isKoJobSlug, type KoJobSlug } from "@/lib/ko-jobs";
 import { isPvpMarketSlug, type PvpMarketSlug } from "@/lib/ko-pvp-catalog";
+import { cache } from "react";
 
 export type Listing = {
   id: string;
@@ -18,6 +19,7 @@ export type Listing = {
   createdAt: string;
   job?: KoJobSlug;
   description?: string;
+  imageUrl?: string;
 };
 
 type ListingRow = {
@@ -64,10 +66,11 @@ function mapRow(r: ListingRow): Listing | null {
     createdAt: formatCreatedAt(createdDate),
     job,
     description: r.description ?? undefined,
+    imageUrl: (r as any).image_url ?? undefined, // Gelecekte eklenecek
   };
 }
 
-export async function getListingById(id: string): Promise<Listing | undefined> {
+export const getListingById = cache(async (id: string): Promise<Listing | undefined> => {
   const pool = await getPool();
   const { rows } = await pool.query<ListingRow>(
     `SELECT * FROM listings WHERE id = $1 AND NOT COALESCE(hidden_by_admin, false)`,
@@ -75,7 +78,7 @@ export async function getListingById(id: string): Promise<Listing | undefined> {
   );
   const mapped = rows[0] ? mapRow(rows[0]) : null;
   return mapped ?? undefined;
-}
+});
 
 /** Yonetim: gizli ilanlar dahil */
 export async function adminGetListingById(id: string): Promise<Listing | undefined> {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { reportOrderMessageAction, sendOrderMessageAction } from "@/lib/message-actions";
 import type { ThreadMessage } from "@/lib/messages";
 
@@ -26,7 +26,7 @@ export default function OrderThreadPanel({
   canUserSendMessages = true,
 }: OrderThreadPanelProps) {
   const router = useRouter();
-  const [lines, setLines] = useState<ThreadMessage[]>(initialMessages);
+  const lines = initialMessages;
   const [draft, setDraft] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [reportFor, setReportFor] = useState<string | null>(null);
@@ -34,10 +34,6 @@ export default function OrderThreadPanel({
   const [reportMsg, setReportMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [reportPending, startReport] = useTransition();
-
-  useEffect(() => {
-    setLines(initialMessages);
-  }, [initialMessages]);
 
   const isBuyer = currentUserId === buyerId;
 
