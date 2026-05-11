@@ -74,6 +74,22 @@ export async function getOrderDetailById(orderId: string): Promise<OrderDetail |
   };
 }
 
+/** Tamamlanma talebi onaylanmis siparis (yonetici iptali engellenir). */
+export async function isOrderSaleCompleted(orderId: string): Promise<boolean> {
+  const pool = await getPool();
+  const { rows } = await pool.query<{ ok: boolean }>(
+    `SELECT EXISTS (
+       SELECT 1
+       FROM order_action_requests ar
+       WHERE ar.order_id = $1
+         AND ar.kind = 'complete_sale'
+         AND ar.status = 'approved'
+     ) AS ok`,
+    [orderId],
+  );
+  return Boolean(rows[0]?.ok);
+}
+
 /**
  * Bakiye dusumu, deftere yazim, siparis ve ilk satici mesajini tek islemde olusturur.
  */
@@ -160,6 +176,19 @@ export async function createOrderFromPurchase(input: {
       listingId: listing.id,
       title: listing.title,
       orderId,
+    });
+
+    await client.query(`UPDATE users SET balance_tl = balance_tl + $1 WHERE id = $2`, [price, sellerId]);
+    const { rows: sellerBalRows } = await client.query<{ balance_tl: number }>(
+      `SELECT balance_tl FROM users WHERE id = $1`,
+      [sellerId],
+    );
+    const sellerAfter = Number(sellerBalRows[0]!.balance_tl);
+    await insertLedger(client, sellerId, "sale_proceeds", price, sellerAfter, {
+      listingId: listing.id,
+      title: listing.title,
+      orderId,
+      buyerId: input.buyerId,
     });
 
     await client.query(

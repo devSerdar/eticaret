@@ -149,10 +149,12 @@ export async function respondOrderActionRequest(input: {
     await client.query("BEGIN");
 
     // Siparisi kilitle ve guncel iptal durumunu teyit et.
-    const { rows: orderLockRows } = await client.query<{ cancelled_at: Date | null; price_tl: number; buyer_id: string }>(
-      `SELECT cancelled_at, price_tl, buyer_id FROM orders WHERE id = $1 FOR UPDATE`,
-      [req.order_id],
-    );
+    const { rows: orderLockRows } = await client.query<{
+      cancelled_at: Date | null;
+      price_tl: number;
+      buyer_id: string;
+      seller_id: string;
+    }>(`SELECT cancelled_at, price_tl, buyer_id, seller_id FROM orders WHERE id = $1 FOR UPDATE`, [req.order_id]);
     const lockedOrder = orderLockRows[0];
     if (!lockedOrder) {
       await client.query("ROLLBACK");
@@ -199,6 +201,25 @@ export async function respondOrderActionRequest(input: {
 
       // Deftere iade kaydı
       await insertLedger(client, lockedOrder.buyer_id, "refund", refundAmount, newBalance, {
+        orderId: req.order_id,
+        reason: "iptal_onaylandi",
+      });
+
+      const { rows: sellerBalRows } = await client.query<{ balance_tl: number }>(
+        `SELECT balance_tl FROM users WHERE id = $1 FOR UPDATE`,
+        [lockedOrder.seller_id],
+      );
+      const sellerBal = Number(sellerBalRows[0]?.balance_tl ?? 0);
+      if (sellerBal < refundAmount) {
+        await client.query("ROLLBACK");
+        return {
+          ok: false,
+          error: "Satici bakiyesi iade tutarini karsilayamiyor; destek ile iletisime gecin.",
+        };
+      }
+      const sellerNewBal = sellerBal - refundAmount;
+      await client.query(`UPDATE users SET balance_tl = $1 WHERE id = $2`, [sellerNewBal, lockedOrder.seller_id]);
+      await insertLedger(client, lockedOrder.seller_id, "sale_clawback", -refundAmount, sellerNewBal, {
         orderId: req.order_id,
         reason: "iptal_onaylandi",
       });

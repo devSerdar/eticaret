@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import AdminOrderCancelForm from "@/components/AdminOrderCancelForm";
+import AdminOrderMessageComposer from "@/components/AdminOrderMessageComposer";
 import { adminGetListingById } from "@/lib/listings";
 import { listMessagesForOrder } from "@/lib/messages";
-import { getOrderDetailById } from "@/lib/orders";
+import { getOrderDetailById, isOrderSaleCompleted } from "@/lib/orders";
 
 type PageProps = {
   params: Promise<{ orderId: string }>;
@@ -16,6 +18,8 @@ export default async function AdminSiparisMesajPage({ params }: PageProps) {
 
   const listing = await adminGetListingById(order.listingId);
   const messages = await listMessagesForOrder(order.id, order.buyerId);
+  const saleCompleted = await isOrderSaleCompleted(order.id);
+  const canAdminCancel = !order.cancelledAt && !saleCompleted;
 
   return (
     <div>
@@ -55,15 +59,53 @@ export default async function AdminSiparisMesajPage({ params }: PageProps) {
           <dt className="text-xs font-bold uppercase text-slate-500">Tutar</dt>
           <dd className="mt-1 font-semibold">{order.priceTl} TL</dd>
         </div>
+        <div className="sm:col-span-2">
+          <dt className="text-xs font-bold uppercase text-slate-500">Durum</dt>
+          <dd className="mt-1">
+            {order.cancelledAt ? (
+              <span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-800">
+                İptal · {order.cancelledAt}
+              </span>
+            ) : saleCompleted ? (
+              <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-900">
+                Satış tamamlandı
+              </span>
+            ) : (
+              <span className="rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold text-sky-900">
+                Aktif (tamamlanmamış)
+              </span>
+            )}
+          </dd>
+        </div>
       </dl>
+
+      <AdminOrderCancelForm orderId={order.id} canCancel={canAdminCancel} />
 
       <section className="mt-10">
         <h2 className="text-lg font-bold text-slate-900">Mesajlar ({messages.length})</h2>
         <ul className="mt-4 space-y-4">
           {messages.map((m) => (
-            <li key={m.id} className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm">
+            <li
+              key={m.id}
+              className={`rounded-2xl border p-4 shadow-sm ${
+                m.fromStaff
+                  ? "border-amber-200/90 bg-amber-50/50 ring-1 ring-amber-100"
+                  : "border-slate-200/90 bg-white"
+              }`}
+            >
               <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                <span className="font-semibold text-slate-900">{m.senderDisplayName}</span>
+                <span className="font-semibold text-slate-900">
+                  {m.fromStaff ? (
+                    <>
+                      <span className="rounded bg-amber-600 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                        Yönetim
+                      </span>{" "}
+                      <span className="text-slate-700">{m.senderDisplayName}</span>
+                    </>
+                  ) : (
+                    m.senderDisplayName
+                  )}
+                </span>
                 <span className="font-mono text-[10px] text-slate-400">{m.id}</span>
                 <span className="tabular-nums text-slate-500">{m.createdAt}</span>
               </div>
@@ -71,6 +113,7 @@ export default async function AdminSiparisMesajPage({ params }: PageProps) {
             </li>
           ))}
         </ul>
+        <AdminOrderMessageComposer orderId={order.id} />
       </section>
 
       <p className="mt-8 text-sm">

@@ -12,6 +12,8 @@ type OrderThreadPanelProps = {
   currentUserId: string;
   buyerId: string;
   initialMessages: ThreadMessage[];
+  /** Iptal / satis tamamlandi: uyeler yazamaz (sunucu da reddeder) */
+  canUserSendMessages?: boolean;
 };
 
 export default function OrderThreadPanel({
@@ -21,6 +23,7 @@ export default function OrderThreadPanel({
   currentUserId,
   buyerId,
   initialMessages,
+  canUserSendMessages = true,
 }: OrderThreadPanelProps) {
   const router = useRouter();
   const [lines, setLines] = useState<ThreadMessage[]>(initialMessages);
@@ -40,8 +43,9 @@ export default function OrderThreadPanel({
 
   const counterpartyLabel = useMemo(() => (isBuyer ? "Satici" : "Alici"), [isBuyer]);
 
-  function labelFor(senderId: string): string {
-    if (senderId === currentUserId) return "Siz";
+  function labelFor(m: ThreadMessage): string {
+    if (m.fromStaff) return "Yonetim";
+    if (m.senderId === currentUserId) return "Siz";
     return counterpartyLabel;
   }
 
@@ -94,23 +98,22 @@ export default function OrderThreadPanel({
       <div className="max-h-[min(420px,50vh)] space-y-3 overflow-y-auto px-5 py-4">
         {lines.map((m) => {
           const mine = m.senderId === currentUserId;
+          const staff = m.fromStaff;
+          const bubbleClass = mine
+            ? "bg-indigo-600 text-white"
+            : staff
+              ? "bg-amber-50 text-amber-950 ring-1 ring-amber-200/90"
+              : "bg-slate-100 text-slate-800 ring-1 ring-slate-200/80";
+          const timeClass = mine ? "text-indigo-100" : staff ? "text-amber-800/80" : "text-slate-500";
           return (
             <div key={m.id} className={`flex flex-col gap-1 ${mine ? "items-end" : "items-start"}`}>
               <div className={`flex max-w-[85%] flex-col ${mine ? "items-end" : "items-start"}`}>
-                <div
-                  className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                    mine
-                      ? "bg-indigo-600 text-white"
-                      : "bg-slate-100 text-slate-800 ring-1 ring-slate-200/80"
-                  }`}
-                >
-                  <p className="text-[10px] font-bold uppercase tracking-wide opacity-80">{labelFor(m.senderId)}</p>
+                <div className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${bubbleClass}`}>
+                  <p className="text-[10px] font-bold uppercase tracking-wide opacity-80">{labelFor(m)}</p>
                   <p className="mt-1 whitespace-pre-wrap [overflow-wrap:anywhere]">{m.body}</p>
-                  <p className={`mt-1 text-[10px] tabular-nums ${mine ? "text-indigo-100" : "text-slate-500"}`}>
-                    {m.createdAt}
-                  </p>
+                  <p className={`mt-1 text-[10px] tabular-nums ${timeClass}`}>{m.createdAt}</p>
                 </div>
-                {!mine ? (
+                {!mine && !staff ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -162,31 +165,38 @@ export default function OrderThreadPanel({
         </form>
       ) : null}
 
-      <form onSubmit={send} className="border-t border-slate-100 p-4">
-        <label htmlFor="thread-input" className="sr-only">
-          Mesaj yaz
-        </label>
-        <textarea
-          id="thread-input"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          rows={2}
-          placeholder="Teslimat icin yazin… (veritabanina kaydedilir)"
-          className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-200"
-        />
-        <button
-          type="submit"
-          disabled={pending}
-          className="mt-3 w-full rounded-xl bg-slate-900 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60 sm:w-auto sm:px-6"
-        >
-          {pending ? "Gonderiliyor…" : "Gonder"}
-        </button>
-        {msg ? (
-          <p className="mt-2 text-sm text-rose-700" role="alert">
-            {msg}
-          </p>
-        ) : null}
-      </form>
+      {canUserSendMessages ? (
+        <form onSubmit={send} className="border-t border-slate-100 p-4">
+          <label htmlFor="thread-input" className="sr-only">
+            Mesaj yaz
+          </label>
+          <textarea
+            id="thread-input"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={2}
+            placeholder="Teslimat icin yazin… (veritabanina kaydedilir)"
+            className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-200"
+          />
+          <button
+            type="submit"
+            disabled={pending}
+            className="mt-3 w-full rounded-xl bg-slate-900 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60 sm:w-auto sm:px-6"
+          >
+            {pending ? "Gonderiliyor…" : "Gonder"}
+          </button>
+          {msg ? (
+            <p className="mt-2 text-sm text-rose-700" role="alert">
+              {msg}
+            </p>
+          ) : null}
+        </form>
+      ) : (
+        <div className="border-t border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+          Bu siparis iptal edildi veya satis tamamlandi. Yeni mesaj yalnizca platform yonetimi tarafindan
+          gonderilebilir; gecmis mesajlari okuyabilirsiniz.
+        </div>
+      )}
     </div>
   );
 }

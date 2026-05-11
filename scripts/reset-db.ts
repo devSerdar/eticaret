@@ -1,8 +1,21 @@
 import "dotenv/config";
 
-import { randomBytes, scryptSync } from "crypto";
+import { randomBytes } from "crypto";
 import { getPool } from "../lib/db";
-import { insertLedger } from "../lib/demo-auth-store";
+import { hashPassword, insertLedger } from "../lib/demo-auth-store";
+
+function summarizeDatabaseUrl(): string {
+  const raw = process.env.DATABASE_URL?.trim();
+  if (!raw) {
+    return "DATABASE_URL yok — lib/db gelistirme varsayilanina (localhost:5432) bakilir.";
+  }
+  const at = raw.lastIndexOf("@");
+  if (at < 0) return "DATABASE_URL ayarli (ozet cikarilamadi).";
+  const tail = raw.slice(at + 1);
+  const q = tail.indexOf("?");
+  const hostDb = q >= 0 ? tail.slice(0, q) : tail;
+  return `DATABASE_URL hedefi: ${hostDb}`;
+}
 
 function resolveAdminEmail(): string {
   const fromSeed = (process.env.ADMIN_SEED_EMAIL ?? "").trim().toLowerCase();
@@ -56,10 +69,7 @@ async function main() {
   const displayName = (process.env.ADMIN_SEED_DISPLAY_NAME ?? "Admin").trim() || "Admin";
   const initialBalanceTL = resolveInitialBalance();
   const id = randomBytes(12).toString("hex");
-  const salt = randomBytes(16);
-  const hash = scryptSync(password, salt, 64);
-  const saltHex = salt.toString("hex");
-  const hashHex = hash.toString("hex");
+  const { saltHex, hashHex } = hashPassword(password);
 
   const clientAdmin = await pool.connect();
   try {
@@ -94,6 +104,10 @@ async function main() {
 
   console.log("=".repeat(64));
   console.log("DB SIFIRLAMA TAMAMLANDI");
+  console.log(summarizeDatabaseUrl());
+  console.log(
+    "Uyari: Giris yapan Next.js ORTAMI bu URL ile AYNI veritabanini kullanmali (or. Docker: docker compose exec web npm run db:reset).",
+  );
   console.log("Admin hesabi otomatik olusturuldu:");
   console.log(`Kullanici adi (email): ${email}`);
   console.log(`Sifre: ${password}`);

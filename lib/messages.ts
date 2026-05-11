@@ -1,3 +1,4 @@
+import { isAdminEmail } from "@/lib/admin-auth";
 import { getPool } from "@/lib/db";
 
 export type ThreadMessage = {
@@ -5,6 +6,8 @@ export type ThreadMessage = {
   orderId: string;
   senderId: string;
   senderDisplayName: string;
+  /** ADMIN_EMAILS ile eslesen gonderen (uyeler gorur) */
+  fromStaff: boolean;
   body: string;
   createdAt: string;
   seenByViewer: boolean;
@@ -37,10 +40,12 @@ export async function listMessagesForOrder(orderId: string, viewerUserId: string
     body: string;
     created_at: Date;
     sender_display_name: string;
+    sender_email: string;
     seen_by_viewer: boolean;
     seen_by_other: boolean;
   }>(
     `SELECT m.id, m.order_id, m.sender_id, m.body, m.created_at, u.display_name AS sender_display_name,
+            u.email AS sender_email,
             mr_viewer.message_id IS NOT NULL AS seen_by_viewer,
             CASE WHEN m.sender_id = $2 THEN mr_other.message_id IS NOT NULL ELSE false END AS seen_by_other
      FROM messages m
@@ -68,6 +73,7 @@ export async function listMessagesForOrder(orderId: string, viewerUserId: string
       orderId: r.order_id,
       senderId: r.sender_id,
       senderDisplayName: r.sender_display_name,
+      fromStaff: isAdminEmail(r.sender_email),
       body: r.body,
       createdAt: created,
       seenByViewer: Boolean(r.seen_by_viewer),

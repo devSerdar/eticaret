@@ -10,8 +10,8 @@ function safeNextPath(next: string | undefined): string {
 }
 
 export async function loginAction(_prev: unknown, formData: FormData): Promise<{ error?: string }> {
-  const email = String(formData.get("email") ?? "");
-  const password = String(formData.get("password") ?? "");
+  const email = String(formData.get("email") ?? "").trim();
+  const password = String(formData.get("password") ?? "").trim();
   const next = safeNextPath(String(formData.get("next") ?? ""));
   const user = await verifyDemoLogin(email, password);
   if (user === "banned") return { error: "Hesabiniz yasaklanmistir. Destek ile iletisime gecin." };
@@ -21,8 +21,8 @@ export async function loginAction(_prev: unknown, formData: FormData): Promise<{
 }
 
 export async function registerAction(_prev: unknown, formData: FormData): Promise<{ error?: string }> {
-  const email = String(formData.get("email") ?? "");
-  const password = String(formData.get("password") ?? "");
+  const email = String(formData.get("email") ?? "").trim();
+  const password = String(formData.get("password") ?? "").trim();
   const displayName = String(formData.get("displayName") ?? "");
   const next = safeNextPath(String(formData.get("next") ?? ""));
   const initial = Number.parseInt(process.env.MOCK_INITIAL_BALANCE_TL ?? "0", 10);

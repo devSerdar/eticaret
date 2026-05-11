@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import OrderThreadPanel from "@/components/OrderThreadPanel";
 import { getListingById } from "@/lib/listings";
 import { listMessagesForOrder, markOrderMessagesSeen } from "@/lib/messages";
-import { getOrderDetailById, userCanAccessOrder } from "@/lib/orders";
+import { getOrderDetailById, isOrderSaleCompleted, userCanAccessOrder } from "@/lib/orders";
 import { getSession } from "@/lib/session";
 
 type PageProps = {
@@ -48,6 +48,8 @@ export default async function MesajThreadPage({ params, searchParams }: PageProp
 
   await markOrderMessagesSeen(order.id, session.userId);
   const messages = await listMessagesForOrder(order.id, session.userId);
+  const saleCompleted = await isOrderSaleCompleted(order.id);
+  const canUserSendMessages = !order.cancelledAt && !saleCompleted;
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-12 sm:py-14">
@@ -82,6 +84,7 @@ export default async function MesajThreadPage({ params, searchParams }: PageProp
           currentUserId={session.userId}
           buyerId={order.buyerId}
           initialMessages={messages}
+          canUserSendMessages={canUserSendMessages}
         />
       </div>
 

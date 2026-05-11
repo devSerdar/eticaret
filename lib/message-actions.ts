@@ -12,7 +12,8 @@ import {
   respondOrderActionRequest,
   type OrderActionRequest,
 } from "@/lib/order-action-requests";
-import { getOrderDetailById, userCanAccessOrder } from "@/lib/orders";
+import { isAdminEmail } from "@/lib/admin-auth";
+import { getOrderDetailById, isOrderSaleCompleted, userCanAccessOrder } from "@/lib/orders";
 import { getSession } from "@/lib/session";
 
 export async function getOrderMessagesAction(
@@ -45,6 +46,12 @@ export async function sendOrderMessageAction(orderId: string, body: string): Pro
   if (me?.bannedAt) return { error: "Hesabiniz yasakli; mesaj gonderemezsiniz." };
   const order = await getOrderDetailById(orderId);
   if (!order || !userCanAccessOrder(session.userId, order)) return { error: "Erisim yok." };
+  if (order.cancelledAt) {
+    return { error: "Iptal edilmis sipariste mesaj yazilamaz; yalnizca yonetim yazabilir." };
+  }
+  if (await isOrderSaleCompleted(orderId)) {
+    return { error: "Tamamlanmis sipariste mesaj yazilamaz; yalnizca yonetim yazabilir." };
+  }
   const t = body.trim();
   if (!t) return { error: "Mesaj bos olamaz." };
   if (t.length > 4000) return { error: "Mesaj en fazla 4000 karakter olabilir." };
@@ -57,6 +64,7 @@ export async function sendOrderMessageAction(orderId: string, body: string): Pro
     t,
   ]);
   revalidatePath(`/mesajlar/${encodeURIComponent(orderId)}`);
+  revalidatePath("/hesabim");
   return {};
 }
 
@@ -80,6 +88,10 @@ export async function reportOrderMessageAction(input: {
   const msg = rows[0];
   if (!msg) return { error: "Mesaj bulunamadi." };
   if (msg.sender_id === session.userId) return { error: "Kendi mesajinizi bildiremezsiniz." };
+  const senderUser = await findUserById(msg.sender_id);
+  if (senderUser && isAdminEmail(senderUser.email)) {
+    return { error: "Yonetim mesajlari bildirilemez." };
+  }
   await createModerationReport({
     kind: "user_message",
     reporterId: session.userId,

@@ -18,6 +18,8 @@ const KIND_TR: Record<BalanceLedgerKind, string> = {
   initial_balance: "Başlangıç bakiyesi",
   topup_simulated: "Bakiye yükleme (sim.)",
   purchase: "Satın alma",
+  sale_proceeds: "Satış geliri",
+  sale_clawback: "İptal — satış düzeltmesi",
   demo_adjust: "Demo düzeltme",
   refund: "İptal iadesi",
 };
@@ -42,8 +44,12 @@ export default async function HesabimPage() {
   const memberSinceLabel = user.memberSince
     ? user.memberSince.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })
     : null;
-  const activeListings = ownListings.filter((l) => l.online);
-  const pastListings = ownListings.filter((l) => !l.online);
+  // Satıcı olduğu siparişi olan ilanlar = satışa girmiş / geçmiş (listing.online ile karıştırma)
+  const sellerOrderListingIds = new Set(
+    orderSummaries.filter((o) => o.role === "seller").map((o) => o.listingId),
+  );
+  const activeListings = ownListings.filter((l) => !sellerOrderListingIds.has(l.id));
+  const pastListings = ownListings.filter((l) => sellerOrderListingIds.has(l.id));
 
   return (
     <div className="hesabim-page">

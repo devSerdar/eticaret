@@ -1,6 +1,13 @@
 import pg from "pg";
 
-export type BalanceLedgerKind = "initial_balance" | "topup_simulated" | "purchase" | "demo_adjust" | "refund";
+export type BalanceLedgerKind =
+  | "initial_balance"
+  | "topup_simulated"
+  | "purchase"
+  | "sale_proceeds"
+  | "sale_clawback"
+  | "demo_adjust"
+  | "refund";
 
 export type BalanceLedgerRow = {
   id: string;

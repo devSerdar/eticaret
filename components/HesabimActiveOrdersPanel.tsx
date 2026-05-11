@@ -426,16 +426,33 @@ export default function HesabimActiveOrdersPanel({
               ) : (
                 <div className="chat-bubble-list">
                   {messages.map((m) => {
-                    const mine = m.senderDisplayName === currentUserDisplayName;
+                    const mine = m.senderId === currentUserId;
+                    const staff = m.fromStaff;
                     return (
-                      <div key={m.id} className={`chat-bubble-row ${mine ? "chat-bubble-row--mine" : "chat-bubble-row--theirs"}`}>
+                      <div
+                        key={m.id}
+                        className={`chat-bubble-row ${mine ? "chat-bubble-row--mine" : "chat-bubble-row--theirs"}${staff && !mine ? " chat-bubble-row--staff" : ""}`}
+                      >
                         {!mine && (
                           <div className="chat-bubble__avatar" aria-hidden>
-                            {getInitial(m.senderDisplayName)}
+                            {staff ? "Y" : getInitial(m.senderDisplayName)}
                           </div>
                         )}
-                        <div className={`chat-bubble ${mine ? "chat-bubble--mine" : "chat-bubble--theirs"}`}>
-                          {!mine && <p className="chat-bubble__sender">{m.senderDisplayName}</p>}
+                        <div
+                          className={`chat-bubble ${mine ? "chat-bubble--mine" : staff ? "chat-bubble--staff" : "chat-bubble--theirs"}`}
+                        >
+                          {!mine && (
+                            <p className="chat-bubble__sender">
+                              {staff ? (
+                                <>
+                                  <span className="chat-bubble__staff-badge">Yönetim</span>{" "}
+                                  {m.senderDisplayName}
+                                </>
+                              ) : (
+                                m.senderDisplayName
+                              )}
+                            </p>
+                          )}
                           <p className="chat-bubble__body">{m.body}</p>
                           <p className={`chat-bubble__time ${mine ? "chat-bubble__time--mine" : ""}`}>
                             {m.createdAt}
@@ -523,63 +540,72 @@ export default function HesabimActiveOrdersPanel({
               )}
             </section>
 
-            {/* Compose area */}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!selected) return;
-                const text = draft.trim();
-                if (!text) return;
-                setError(null);
-                startSending(async () => {
-                  const r = await sendOrderMessageAction(selected.id, text);
-                  if (r.error) { setError(r.error); return; }
-                  setDraft("");
-                  await fetchMessages(selected.id);
-                });
-              }}
-              className="chat-compose"
-            >
-              {error && <p className="chat-compose__error">{error}</p>}
-              <div className="chat-compose__inner">
-                <textarea
-                  value={draft}
-                  onChange={(e) => {
-                    setDraft(e.target.value);
-                    // Otomatik yükseklik
-                    e.target.style.height = "auto";
-                    e.target.style.height = Math.min(e.target.scrollHeight, 140) + "px";
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      if (sending) return;
-                      const form = e.currentTarget.form;
-                      if (form) form.requestSubmit();
-                    }
-                  }}
-                  rows={3}
-                  placeholder="Mesajınızı yazın… (Enter = gönder, Shift+Enter = yeni satır)"
-                  className="chat-compose__textarea"
-                />
-                <button
-                  type="submit"
-                  disabled={sending || !draft.trim()}
-                  className="chat-compose__send"
-                  aria-label="Gönder"
-                >
-                  {sending ? (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden className="chat-compose__spin">
-                      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4"/>
-                    </svg>
-                  ) : (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                      <path d="m22 2-11 20-4-9-9-4 24-7z"/>
-                    </svg>
-                  )}
-                </button>
+            {/* Compose area — yalnızca aktif siparişlerde */}
+            {selected.status === "active" ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!selected) return;
+                  const text = draft.trim();
+                  if (!text) return;
+                  setError(null);
+                  startSending(async () => {
+                    const r = await sendOrderMessageAction(selected.id, text);
+                    if (r.error) { setError(r.error); return; }
+                    setDraft("");
+                    await fetchMessages(selected.id);
+                  });
+                }}
+                className="chat-compose"
+              >
+                {error && <p className="chat-compose__error">{error}</p>}
+                <div className="chat-compose__inner">
+                  <textarea
+                    value={draft}
+                    onChange={(e) => {
+                      setDraft(e.target.value);
+                      e.target.style.height = "auto";
+                      e.target.style.height = Math.min(e.target.scrollHeight, 140) + "px";
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        if (sending) return;
+                        const form = e.currentTarget.form;
+                        if (form) form.requestSubmit();
+                      }
+                    }}
+                    rows={3}
+                    placeholder="Mesajınızı yazın… (Enter = gönder, Shift+Enter = yeni satır)"
+                    className="chat-compose__textarea"
+                  />
+                  <button
+                    type="submit"
+                    disabled={sending || !draft.trim()}
+                    className="chat-compose__send"
+                    aria-label="Gönder"
+                  >
+                    {sending ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden className="chat-compose__spin">
+                        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4"/>
+                      </svg>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <path d="m22 2-11 20-4-9-9-4 24-7z"/>
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="chat-compose chat-compose--locked">
+                <p className="m-0 text-sm leading-relaxed text-slate-600">
+                  {selected.status === "cancelled"
+                    ? "Bu sipariş iptal edildi. Yeni mesaj gönderemezsiniz; yalnızca yönetim yazabilir."
+                    : "Bu sipariş tamamlandı. Yeni mesaj gönderemezsiniz; yalnızca yönetim yazabilir."}
+                </p>
               </div>
-            </form>
+            )}
           </div>
         </div>
       )}

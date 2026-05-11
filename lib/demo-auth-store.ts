@@ -52,7 +52,8 @@ function isPgUniqueViolation(e: unknown): boolean {
   return typeof e === "object" && e !== null && "code" in e && (e as { code: string }).code === "23505";
 }
 
-function hashPassword(password: string): { saltHex: string; hashHex: string } {
+/** Sifre hash; db:reset / kayit ile ayni algoritma */
+export function hashPassword(password: string): { saltHex: string; hashHex: string } {
   const salt = randomBytes(16);
   const hash = scryptSync(password, salt, 64);
   return { saltHex: salt.toString("hex"), hashHex: hash.toString("hex") };
@@ -138,9 +139,9 @@ export async function verifyDemoLogin(
   email: string,
   password: string,
 ): Promise<DemoUser | null | "banned"> {
-  const user = await findUserByEmail(email);
+  const user = await findUserByEmail(email.trim());
   if (!user) return null;
-  if (!verifyPassword(password, user.passwordSaltHex, user.passwordHashHex)) return null;
+  if (!verifyPassword(password.trim(), user.passwordSaltHex, user.passwordHashHex)) return null;
   if (user.bannedAt) return "banned";
   return user;
 }

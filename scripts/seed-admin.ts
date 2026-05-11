@@ -1,8 +1,8 @@
 import "dotenv/config";
 
-import { randomBytes, scryptSync } from "crypto";
+import { randomBytes } from "crypto";
 import { getPool } from "../lib/db";
-import { insertLedger } from "../lib/demo-auth-store";
+import { hashPassword, insertLedger } from "../lib/demo-auth-store";
 
 function resolveAdminEmail(): string {
   const fromSeed = (process.env.ADMIN_SEED_EMAIL ?? "").trim().toLowerCase();
@@ -33,10 +33,7 @@ async function main() {
   const displayName = (process.env.ADMIN_SEED_DISPLAY_NAME ?? "Admin").trim() || "Admin";
   const initialBalanceTL = resolveInitialBalance();
   const id = randomBytes(12).toString("hex");
-  const salt = randomBytes(16);
-  const hash = scryptSync(password, salt, 64);
-  const saltHex = salt.toString("hex");
-  const hashHex = hash.toString("hex");
+  const { saltHex, hashHex } = hashPassword(password);
 
   const pool = await getPool();
   const client = await pool.connect();
