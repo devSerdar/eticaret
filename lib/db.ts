@@ -188,6 +188,7 @@ async function runMigrations(p: pg.Pool) {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS ban_reason TEXT;
 
     ALTER TABLE listings ADD COLUMN IF NOT EXISTS hidden_by_admin BOOLEAN NOT NULL DEFAULT false;
+    ALTER TABLE listings ADD COLUMN IF NOT EXISTS image_url TEXT;
   `);
 
   await p.query(`

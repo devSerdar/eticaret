@@ -41,33 +41,34 @@ export default function MarketListingPagination({
   const nums = visiblePageNumbers(totalPages, currentPage);
 
   return (
-    <nav
-      className="flex flex-col items-stretch gap-4 rounded-2xl border border-slate-200/90 bg-white/95 p-4 shadow-[var(--shadow-sm)] ring-1 ring-slate-900/[0.03] sm:flex-row sm:items-center sm:justify-between sm:px-5"
-      aria-label="Sayfalama"
-    >
-      <p className="text-center text-sm text-[var(--text-muted)] sm:text-left">
-        Sayfa <span className="font-semibold text-slate-800">{currentPage}</span> /{" "}
-        <span className="font-semibold text-slate-800">{totalPages}</span>
-      </p>
+    <nav className="flex items-center justify-between px-4 sm:px-0 w-full" aria-label="Sayfalama">
+      <div className="hidden sm:block">
+        <p className="text-sm text-slate-700">
+          Sayfa <span className="font-semibold">{currentPage}</span> / <span className="font-semibold">{totalPages}</span>
+        </p>
+      </div>
 
-      <div className="flex flex-wrap items-center justify-center gap-2">
+      <div className="flex flex-1 items-center justify-between sm:justify-end gap-2">
         <Link
           href={marketListingHref(basePath, state(currentPage - 1))}
           scroll={false}
           aria-disabled={currentPage <= 1}
-          className={`rounded-xl border px-4 py-2 text-sm font-semibold transition ${
+          className={`relative inline-flex items-center rounded-md px-3 py-2 text-sm font-semibold ring-1 ring-inset transition-all ${
             currentPage <= 1
-              ? "pointer-events-none border-slate-100 bg-slate-50 text-slate-300"
-              : "border-slate-200/90 bg-white text-slate-800 hover:border-indigo-200 hover:bg-indigo-50/60 hover:text-indigo-800"
+              ? "pointer-events-none bg-slate-50 text-slate-300 ring-slate-200"
+              : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50 hover:text-indigo-600"
           }`}
         >
-          Onceki
+          <svg className="mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Önceki
         </Link>
 
-        <div className="flex flex-wrap items-center justify-center gap-1">
+        <div className="hidden md:flex items-center gap-1 mx-4">
           {nums.map((item, idx) =>
             item === "ellipsis" ? (
-              <span key={`e-${idx}`} className="px-1.5 text-slate-400">
+              <span key={`e-${idx}`} className="px-2 text-slate-400">
                 …
               </span>
             ) : (
@@ -75,10 +76,10 @@ export default function MarketListingPagination({
                 key={item}
                 href={marketListingHref(basePath, state(item))}
                 scroll={false}
-                className={`flex h-9 min-w-9 items-center justify-center rounded-lg px-2 text-sm font-semibold transition ${
+                className={`relative inline-flex h-9 w-9 items-center justify-center rounded-md text-sm font-semibold transition-all ${
                   item === currentPage
-                    ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/25"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    ? "bg-indigo-600 text-white shadow-sm"
+                    : "text-slate-700 hover:bg-slate-100"
                 }`}
               >
                 {item}
@@ -91,13 +92,16 @@ export default function MarketListingPagination({
           href={marketListingHref(basePath, state(currentPage + 1))}
           scroll={false}
           aria-disabled={currentPage >= totalPages}
-          className={`rounded-xl border px-4 py-2 text-sm font-semibold transition ${
+          className={`relative inline-flex items-center rounded-md px-3 py-2 text-sm font-semibold ring-1 ring-inset transition-all ${
             currentPage >= totalPages
-              ? "pointer-events-none border-slate-100 bg-slate-50 text-slate-300"
-              : "border-slate-200/90 bg-white text-slate-800 hover:border-indigo-200 hover:bg-indigo-50/60 hover:text-indigo-800"
+              ? "pointer-events-none bg-slate-50 text-slate-300 ring-slate-200"
+              : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50 hover:text-indigo-600"
           }`}
         >
           Sonraki
+          <svg className="ml-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
         </Link>
       </div>
     </nav>

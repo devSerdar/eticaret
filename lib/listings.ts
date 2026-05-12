@@ -35,6 +35,7 @@ type ListingRow = {
   online: boolean;
   job: string | null;
   description: string | null;
+  image_url?: string | null;
   created_at: Date;
 };
 
@@ -66,7 +67,7 @@ function mapRow(r: ListingRow): Listing | null {
     createdAt: formatCreatedAt(createdDate),
     job,
     description: r.description ?? undefined,
-    imageUrl: (r as any).image_url ?? undefined, // Gelecekte eklenecek
+    imageUrl: r.image_url ?? undefined, // Gelecekte eklenecek
   };
 }
 
@@ -143,6 +144,21 @@ export async function listListingsBySellerUserId(
      ORDER BY online DESC, created_at DESC, id DESC
      LIMIT $2`,
     [sellerUserId, lim],
+  );
+  return rows.map((r) => mapRow(r)).filter((x): x is Listing => x !== null);
+}
+
+/** Ana sayfa vitrini: En son eklenen aktif ilanlar */
+export async function getLatestPublicListings(limit = 6): Promise<Listing[]> {
+  const pool = await getPool();
+  const lim = Math.min(20, Math.max(1, Math.floor(limit)));
+  const { rows } = await pool.query<ListingRow>(
+    `SELECT id, game_slug, server_slug, market_slug, title, price, seller, seller_user_id, hidden_by_admin, online, job, description, image_url, created_at
+     FROM listings
+     WHERE NOT COALESCE(hidden_by_admin, false)
+     ORDER BY created_at DESC, id DESC
+     LIMIT $1`,
+    [lim],
   );
   return rows.map((r) => mapRow(r)).filter((x): x is Listing => x !== null);
 }

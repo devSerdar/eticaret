@@ -69,9 +69,9 @@ function applyListingFilters(
 }
 
 const marketHero: Record<string, string> = {
-  item: "from-violet-600 via-fuchsia-600 to-pink-500",
-  css: "from-sky-600 via-cyan-600 to-teal-500",
-  goldbar: "from-amber-500 via-orange-500 to-yellow-400",
+  item: "from-violet-500 to-fuchsia-500",
+  css: "from-sky-500 to-cyan-500",
+  goldbar: "from-amber-500 to-orange-500",
 };
 
 export default async function PvpMarketListPage({ params, searchParams }: MarketListProps) {
@@ -83,17 +83,14 @@ export default async function PvpMarketListPage({ params, searchParams }: Market
 
   const server = getPvpServerBySlug(serverSlug);
   if (!server) {
-    console.warn("[pvp-market] server_not_found", { serverParam, serverSlug, marketParam, marketSlug });
     notFound();
   }
   if (!isPvpMarketSlug(marketSlug)) {
-    console.warn("[pvp-market] market_slug_invalid", { serverParam, serverSlug, marketParam, marketSlug });
     notFound();
   }
 
   const market = getPvpMarketBySlug(marketSlug);
   if (!market) {
-    console.warn("[pvp-market] market_not_found", { marketParam, marketSlug });
     notFound();
   }
 
@@ -155,128 +152,123 @@ export default async function PvpMarketListPage({ params, searchParams }: Market
   const pageListings = filtered.slice(pageOffset, pageOffset + MARKET_LISTINGS_PAGE_SIZE);
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-12 sm:py-14">
-      <nav className="flex flex-wrap items-center gap-2 text-sm text-[var(--text-muted)]">
-        <Link
-          href="/ilanlar"
-          className="rounded-full bg-white/90 px-3 py-1 font-medium text-indigo-700 shadow-sm ring-1 ring-slate-200/80 transition hover:bg-indigo-50"
-        >
-          Sunucu ara
+    <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      {/* Subtle Breadcrumbs */}
+      <nav aria-label="Breadcrumb" className="mb-6 flex items-center gap-2 text-sm text-slate-500">
+        <Link href="/ilanlar" className="hover:text-indigo-600 transition-colors">
+          Tüm Sunucular
         </Link>
-        <span className="text-slate-300">/</span>
-        <Link
-          href={`/ilanlar/pvp/${server.slug}`}
-          className="rounded-full bg-white/90 px-3 py-1 font-medium text-indigo-700 shadow-sm ring-1 ring-slate-200/80 transition hover:bg-indigo-50"
-        >
+        <svg className="h-4 w-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+        <Link href={`/ilanlar/pvp/${server.slug}`} className="hover:text-indigo-600 transition-colors">
           {server.name}
         </Link>
-        <span className="text-slate-300">/</span>
-        <span className="rounded-full bg-slate-900/[0.04] px-3 py-1 font-medium text-slate-800 ring-1 ring-slate-900/5">
-          {market.label}
-        </span>
+        <svg className="h-4 w-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+        <span className="font-semibold text-slate-900">{market.label}</span>
       </nav>
 
-      <div className="relative mt-8 overflow-hidden rounded-3xl border border-white/70 bg-white/90 shadow-[var(--shadow-lg)] ring-1 ring-slate-900/5">
-        <div className={`absolute inset-0 bg-gradient-to-br ${heroGradient} opacity-[0.12]`} />
-        <div className="relative flex flex-col gap-4 border-b border-slate-200/60 p-6 sm:flex-row sm:items-end sm:justify-between sm:p-8">
+      {/* Professional Page Header */}
+      <div className="relative mb-8 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+        <div className={`absolute inset-0 bg-gradient-to-r ${heroGradient} opacity-[0.08]`} />
+        
+        <div className="relative flex flex-col gap-6 p-8 sm:flex-row sm:items-center sm:justify-between sm:p-10">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">{gameName}</p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-              {server.name}
-              <span className="text-slate-300"> — </span>
-              {market.label}
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-700/10">
+                {gameName}
+              </span>
+            </div>
+            <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+              {server.name} <span className="mx-2 font-light text-slate-300">/</span> {market.label}
             </h1>
-            <p className="mt-2 text-sm text-[var(--text-muted)] sm:text-base">
-              {filtered.length} ilan
-              {filtered.length > 0 ? (
-                <>
-                  {" "}
-                  · sayfa basina {MARKET_LISTINGS_PAGE_SIZE}
-                  {totalPages > 1 ? (
-                    <>
-                      {" "}
-                      · sayfa {currentPage}/{totalPages}
-                    </>
-                  ) : null}
-                </>
-              ) : null}
-              {baseListings.length !== filtered.length ? (
-                <span className="text-slate-400"> ({baseListings.length} bu pazarda)</span>
-              ) : null}
+            <p className="mt-3 text-base text-slate-500 max-w-xl">
+              En güvenilir satıcılardan uygun fiyatlı ilanları keşfedin, güvenle alışveriş yapın.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <span className="rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200/80">
-              Filtre: URL ile paylasilabilir
-            </span>
+          
+          <div className="flex items-center gap-6 sm:border-l sm:border-slate-200 sm:pl-8">
+            <div className="flex flex-col">
+              <span className="text-3xl font-bold tracking-tight text-slate-900">{filtered.length}</span>
+              <span className="mt-1 text-xs font-medium uppercase tracking-wider text-slate-500">Aktif İlan</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="mt-8 lg:grid lg:grid-cols-[minmax(0,300px)_1fr] lg:items-stretch lg:gap-10">
-        <aside className="min-h-0 lg:flex lg:flex-col">
-          <section className="rounded-2xl border border-slate-200/90 bg-white/95 p-5 shadow-[var(--shadow-sm)] ring-1 ring-slate-900/[0.03] backdrop-blur-sm lg:sticky lg:top-24">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-sm font-bold text-slate-900">Filtreler</h2>
-              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                GET
-              </span>
+      <div className="lg:grid lg:grid-cols-[280px_1fr] lg:items-start lg:gap-8">
+        {/* Sidebar Filters */}
+        <aside className="mb-8 lg:sticky lg:top-8 lg:mb-0">
+          <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <h2 className="text-lg font-semibold text-slate-900">Filtreler</h2>
+              {filtered.length > 0 && (
+                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                  {filtered.length} Sonuç
+                </span>
+              )}
             </div>
-            <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-              Sonuclari daralt; linki kopyalayip paylasabilirsin.
-            </p>
-
-            <MarketListingFilterForm
-              basePath={actionPath}
-              isItemMarket={isItemMarket}
-              initial={{
-                q,
-                min: query.min ?? "",
-                max: query.max ?? "",
-                job: jobForQuery,
-                sort: sortForQuery,
-              }}
-            />
-          </section>
+            <div className="pt-6">
+              <MarketListingFilterForm
+                basePath={actionPath}
+                isItemMarket={isItemMarket}
+                initial={{
+                  q,
+                  min: query.min ?? "",
+                  max: query.max ?? "",
+                  job: jobForQuery,
+                  sort: sortForQuery,
+                }}
+              />
+            </div>
+          </div>
         </aside>
 
-        <div
-          className={`flex min-h-0 flex-col lg:h-full ${
-            filtered.length > 0 && totalPages > 1 ? "max-lg:min-h-[50svh]" : ""
-          }`}
-        >
+        {/* Listings Grid */}
+        <div className="flex min-h-[400px] flex-col">
           {filtered.length === 0 ? (
-            <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300/90 bg-white/80 p-12 text-center shadow-[var(--shadow-sm)]">
-              <p className="text-sm font-semibold text-slate-800">Sonuc yok</p>
-              <p className="mt-2 text-sm text-[var(--text-muted)]">Filtreleri yumusatmayi dene.</p>
+            <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-12 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-slate-200">
+                <svg className="h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <h3 className="mt-6 text-lg font-semibold text-slate-900">İlan Bulunamadı</h3>
+              <p className="mt-2 text-sm text-slate-500 max-w-sm">
+                Arama kriterlerinize uygun aktif bir ilan yok. Lütfen filtrelerinizi esneterek tekrar deneyin.
+              </p>
+              <Link 
+                href={actionPath}
+                className="mt-6 inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+              >
+                Filtreleri Temizle
+              </Link>
             </div>
           ) : (
             <>
-              <div className="grid shrink-0 grid-cols-1 gap-4 sm:grid-cols-2 sm:items-stretch">
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
                 {pageListings.map((listing) => (
-                  <div key={listing.id} className="flex min-h-0 h-full min-w-0">
-                    <ListingCard
-                      listing={listing}
-                      gameName={gameName}
-                      serverName={server.name}
-                      marketLabel={market.label}
-                    />
-                  </div>
+                  <ListingCard
+                    key={listing.id}
+                    listing={listing}
+                    gameName={gameName}
+                    serverName={server.name}
+                    marketLabel={market.label}
+                  />
                 ))}
               </div>
-              {totalPages > 1 ? (
-                <>
-                  <div className="min-h-0 flex-1" aria-hidden />
-                  <div className="shrink-0 border-t border-slate-100/90 pt-6">
-                    <MarketListingPagination
-                      basePath={actionPath}
-                      query={listingQueryBase}
-                      currentPage={currentPage}
-                      totalPages={totalPages}
-                    />
-                  </div>
-                </>
-              ) : null}
+              {totalPages > 1 && (
+                <div className="mt-10 flex justify-center border-t border-slate-200 pt-8">
+                  <MarketListingPagination
+                    basePath={actionPath}
+                    query={listingQueryBase}
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                  />
+                </div>
+              )}
             </>
           )}
         </div>

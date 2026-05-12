@@ -11,41 +11,25 @@ type ListingCardProps = {
   marketLabel: string;
 };
 
-const marketAccent: Record<PvpMarketSlug, { bar: string; icon: string; glow: string }> = {
-  item: {
-    bar: "from-violet-500 via-fuchsia-500 to-pink-500",
-    icon: "from-violet-600 to-fuchsia-600",
-    glow: "shadow-violet-500/20",
-  },
-  css: {
-    bar: "from-sky-500 via-cyan-500 to-teal-400",
-    icon: "from-sky-600 to-cyan-600",
-    glow: "shadow-cyan-500/20",
-  },
-  goldbar: {
-    bar: "from-amber-500 via-orange-500 to-yellow-400",
-    icon: "from-amber-600 to-orange-600",
-    glow: "shadow-amber-500/25",
-  },
+const marketTheme: Record<PvpMarketSlug, { bg: string; text: string }> = {
+  item: { bg: "bg-indigo-50", text: "text-indigo-700" },
+  css: { bg: "bg-sky-50", text: "text-sky-700" },
+  goldbar: { bg: "bg-amber-50", text: "text-amber-700" },
 };
 
 export default function ListingCard({ listing, gameName, serverName, marketLabel }: ListingCardProps) {
-  const accent = marketAccent[listing.marketSlug];
+  const theme = marketTheme[listing.marketSlug] || marketTheme.item;
 
   return (
     <Link
       href={`/ilanlar/${listing.id}`}
       scroll={false}
-      className="block h-full min-h-0 w-full max-w-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+      className="group flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 transition-all duration-200 hover:-translate-y-1 hover:shadow-md hover:ring-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
     >
-      <article
-        className={`group relative flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 shadow-[var(--shadow-sm)] ring-1 ring-slate-900/[0.04] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)] ${accent.glow}`}
-      >
-      <div className={`h-1.5 shrink-0 bg-gradient-to-r ${accent.bar}`} />
       <div className="flex flex-1 flex-col p-5">
-        <div className="flex min-h-0 flex-1 gap-4">
+        <div className="flex gap-4">
           <div
-            className={`relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br ${accent.icon} text-lg font-black text-white shadow-lg`}
+            className={`relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl ${theme.bg} ${theme.text} text-xl font-bold ring-1 ring-inset ring-black/5`}
             aria-hidden
           >
             {listing.imageUrl ? (
@@ -58,61 +42,58 @@ export default function ListingCard({ listing, gameName, serverName, marketLabel
               "I"
             )}
           </div>
-          <div className="flex min-w-0 flex-1 flex-col">
-            <div className="flex min-w-0 items-start justify-between gap-2">
-              <p className="min-w-0 flex-1 text-[11px] font-semibold uppercase leading-snug tracking-wider text-slate-500 break-words [overflow-wrap:anywhere] line-clamp-2">
-                {gameName}
-                <span className="text-slate-300"> · </span>
-                {serverName}
-                {listing.job ? (
-                  <>
-                    <span className="text-slate-300"> · </span>
-                    <span className="text-indigo-600">{getKoJobLabel(listing.job)}</span>
-                  </>
-                ) : null}
-              </p>
-              <span className="shrink-0 rounded-full bg-slate-900/[0.04] px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-900/5">
+          
+          <div className="flex min-w-0 flex-1 flex-col justify-center">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`inline-flex items-center rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset ${theme.bg} ${theme.text} ring-black/10`}>
                 {marketLabel}
               </span>
+              {listing.job && (
+                <span className="inline-flex items-center rounded-md bg-slate-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600 ring-1 ring-inset ring-slate-200">
+                  {getKoJobLabel(listing.job)}
+                </span>
+              )}
             </div>
-            <h3
-              className="mt-2 line-clamp-3 min-h-0 w-full text-base font-semibold leading-snug text-slate-900 [overflow-wrap:anywhere] break-words sm:text-lg"
-              title={listing.title}
+            <p className="mt-2 truncate text-[11px] font-medium text-slate-400 uppercase tracking-wide">
+              {gameName} <span className="mx-1">·</span> {serverName}
+            </p>
+          </div>
+        </div>
+
+        <h3 className="mt-5 line-clamp-2 min-h-[3rem] text-base font-semibold leading-relaxed text-slate-900" title={listing.title}>
+          {listing.title}
+        </h3>
+
+        <div className="mt-auto pt-6">
+          <div className="flex items-end justify-between">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Fiyat</p>
+              <div className="mt-0.5 flex items-baseline gap-1">
+                <span className="text-2xl font-black tracking-tight text-slate-900">{listing.price}</span>
+                <span className="text-sm font-bold text-slate-500">TL</span>
+              </div>
+            </div>
+            
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${
+                listing.online
+                  ? "bg-emerald-50 text-emerald-700 ring-emerald-600/20"
+                  : "bg-slate-50 text-slate-600 ring-slate-500/20"
+              }`}
             >
-              {listing.title}
-            </h3>
+              <span className={`h-1.5 w-1.5 rounded-full ${listing.online ? "bg-emerald-500" : "bg-slate-400"}`} />
+              {listing.online ? "Çevrimiçi" : "Çevrimdışı"}
+            </span>
+          </div>
 
-            <div className="mt-auto border-t border-slate-100 pt-4">
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Fiyat</p>
-                  <p className="text-2xl font-bold tracking-tight text-slate-900">
-                    {listing.price}
-                    <span className="ml-1 text-base font-semibold text-slate-500">TL</span>
-                  </p>
-                </div>
-                <span
-                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                    listing.online
-                      ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100"
-                      : "bg-slate-100 text-slate-600 ring-1 ring-slate-200/80"
-                  }`}
-                >
-                  {listing.online ? "Cevrimici" : "Cevrimdisi"}
-                </span>
-              </div>
-
-              <div className="mt-3 flex items-center justify-between gap-2 text-sm text-[var(--text-muted)]">
-                <span className="min-w-0 truncate">
-                  Satici: <span className="font-medium text-slate-700">{listing.seller}</span>
-                </span>
-                <span className="shrink-0 text-slate-500">{listing.createdAt}</span>
-              </div>
-            </div>
+          <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 text-[11px] font-medium text-slate-500">
+            <span className="truncate pr-2">
+              Satıcı: <span className="text-slate-700">{listing.seller}</span>
+            </span>
+            <span className="shrink-0">{listing.createdAt}</span>
           </div>
         </div>
       </div>
-      </article>
     </Link>
   );
 }
